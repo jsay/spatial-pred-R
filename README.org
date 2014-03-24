@@ -9,4 +9,4 @@ This project is under construction
 
 * Dependencies
 
-  The =R= package =spdep= > XX.XX available on CRAN
+  The =R= package =spdep= > XX.XX available from CRAN
