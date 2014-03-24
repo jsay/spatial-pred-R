@@ -1,0 +1,2 @@
+#+TITLE:  Extending Predictions from Spatial Econometric Models on R
+#+AUTHOR: Jean-Sauveur Ay
