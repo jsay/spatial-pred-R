@@ -4,9 +4,9 @@ This project is under construction
 
 * Documentation
 
-  Read the [[url:http://htmlpreview.github.io/?https://github.com/jsay/spatial-pred-R/blob/master/DOC.html][HTML version]], download the [[url:https://github.com/jsay/spatial-pred-R/blob/master/DOC.pdf][PDF version]], or contribute to
-  the [[url:https://github.com/jsay/spatial-pred-R/blob/master/DOC.org][ORG version]].
+  Read the [[http://htmlpreview.github.io/?https://github.com/jsay/spatial-pred-R/blob/master/DOC.html][HTML version]], download the [[https://github.com/jsay/spatial-pred-R/blob/master/DOC.pdf][PDF version]], or contribute to
+  the [[https://github.com/jsay/spatial-pred-R/blob/master/DOC.org][ORG version]].
 
 * Dependencies
 
-  =spdep= > XX.XX
+  The =R= package =spdep= > XX.XX available on CRAN
