@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Extending Predictions from Spatial Econometric Models on R</title>
-<!-- 2014-03-31 lun. 17:44 -->
+<!-- 2014-04-02 mer. 17:20 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="generator" content="Org-mode"/>
 <meta name="author" content="Jean-Sauveur AY \\ \lt[[mailto:jsay.site@gmail.com][jsay.site@gmail.com]]jsay.site@gmail.com\gt \and Julie LE GALLO\\ \lt[[mailto:jlegallo@univ-fcomte.fr][jlegallo@univ-fcomte.fr\gt]]jlegallo@univ-fcomte.fr\gt"/>
@@ -292,6 +292,12 @@ actually under construction: <span class="timestamp-wrapper"><span class="timest
 <ul class="org-ul">
 <li>Code the variances and confidence intervals of predictors
 </li>
+<li>The question of different weight matrix between lags and errors
+</li>
+<li>Links with predictors from geostatistics (kriging)
+</li>
+<li>Implement for objects form <code>sphet</code> and <code>splm</code>
+</li>
 </ul>
 
 </div>
@@ -336,8 +342,8 @@ actually under construction: <span class="timestamp-wrapper"><span class="timest
 <h3 id="sec-2-1"><span class="section-number-3">2.1</span> Spatial Econometric Framework</h3>
 <div class="outline-text-3" id="text-2-1">
 <p>
-From the more general from of the Cliff-Ord (1973, 1981) class of
-models,<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
+From the more general from of the Cliff-Ord (1973, 1981)
+homoscedastic class of models with exogenous covariates,<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
 </p>
 
 \begin{align}
@@ -376,6 +382,10 @@ models (SEM, SDM and SARAR) and the lag models (SAR, SDM and SARAR)
 <p>
 The bias of actual predictors come from the correlation between
 the spatially lagged dependent variable and the error term.
+</p>
+
+<p>
+Since \(W_{ii}=0\), \(W y\) does not use \(y_i\) to predict itself.
 </p>
 
 <p>

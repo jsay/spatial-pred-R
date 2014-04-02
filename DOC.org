@@ -8,7 +8,7 @@
 #+PROPERTY:    session *R*
 #+PROPERTY:    exports both
 #+PROPERTY:    eval no
-#+INFOJS_OPT:  view:t toc:t ltoc:t mouse:underline buttons:0 path:http://thomasf.github.io/solarized-css/org-info.min.js
+#+INFOJS_OPT:  view:t toc:t mouse:underline buttons:0 path:http://thomasf.github.io/solarized-css/org-info.min.js
 #+HTML_HEAD:   <link rel="stylesheet" type="text/css" href="http://thomasf.github.io/solarized-css/solarized-light.min.css" />
 #+BEGIN_abstract
 This repository presents some improvements of the =R= function used to
@@ -17,8 +17,13 @@ actually under construction: <2014-03-24 lun.>.\\
 
 *TODO*
 - Code the variances and confidence intervals of predictors
+- The question of different weight matrix between lags and errors
+- Links with predictors from geostatistics (kriging)
+- Implement for objects form =sphet= and =splm=
 
 #+END_abstract
+
+# http://www.springerreference.com/docs/html/chapterdbid/62922.html
 
 * Getting started
 ** Changes relative to current function
@@ -37,8 +42,8 @@ actually under construction: <2014-03-24 lun.>.\\
 * Econometric Theory
 ** Spatial Econometric Framework
 
-   From the more general from of the Cliff-Ord (1973, 1981) class of
-   models,[fn:1]
+   From the more general from of the Cliff-Ord (1973, 1981)
+   homoscedastic class of models with exogenous covariates,[fn:1]
 
 \begin{align}
 y           & = \rho Wy+X\beta+\gamma WX+ \varepsilon\nonumber\\
@@ -69,6 +74,8 @@ y           & = \rho Wy+X\beta+\gamma WX+ \varepsilon\nonumber\\
 
    The bias of actual predictors come from the correlation between
    the spatially lagged dependent variable and the error term.
+
+   Since $W_{ii}=0$, $W y$ does not use $y_i$ to predict itself.
 
    Can we still maintain the signal trend distinction?
 
