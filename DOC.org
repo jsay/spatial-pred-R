@@ -20,6 +20,7 @@ actually under construction: <2014-03-24 lun.>.\\
 - The question of different weight matrix between lags and errors
 - Links with predictors from geostatistics (kriging)
 - Implement for objects form =sphet= and =splm=
+- Leave one out from LSP with simple computation, useful?
 
 #+END_abstract
 
@@ -61,6 +62,11 @@ y           & = \rho Wy+X\beta+\gamma WX+ \varepsilon\nonumber\\
    \mid< 1$. /standardization of W?/ Not the same notations than
    KP 2007.
 
+   The geo-statistical models usually involve specifying spatial
+   dependence through the error process as opposed to the spatial lag
+   of the y vector, and these "error models" take a simpler form than
+   autoregressive models
+
    This model is sufficiently general that the SARAR(1,1) model can be
    recovered with $\theta= 0$ (Kelejian2007) (also called SAC by
    Biva02, BPGR13), the spatial error model (SEM) can be recovered
@@ -77,7 +83,11 @@ y           & = \rho Wy+X\beta+\gamma WX+ \varepsilon\nonumber\\
 
    Since $W_{ii}=0$, $W y$ does not use $y_i$ to predict itself.
 
-   Can we still maintain the signal trend distinction?
+   Can we still maintain the signal trend distinction? Does it the
+   same as direct and indirect effects of covariates?
+
+   We develop a framework of prediction from models with
+   interdependent observations.
 
    We have to explain the differences between in-sample, out-of-sample
    and ex-sample in a spatial context. Ex-sample is not necessary
@@ -122,7 +132,7 @@ library(spdep) ; predict.sarlm
   models. For that, we have to put =legacy=== =FALSE=. The signal is
   computed by difference for the lag models in out of sample.
 
-* The New Functionalities
+* The New Extension
 ** Choosing a type of predictor
 
    Our new =R= function for spatial predictions -- called =sppred= for
@@ -147,15 +157,13 @@ library(spdep) ; predict.sarlm
    =predict.sarlm= (it corresponds to the predictor KP4 for lag models
    and KP5 for error models).
 
-** Specifying  
+** Specifying
 ** General structure, usual checks, and IS predictions
 
-   Here the code
+   Here the code, for the inverse integrating directly the code from
+   powerWeigths?
 
-** The predictors 1 for OS predictions
-
-   
-
+** The predictors 1 for OS predictions   
 * Testing
 
 * Footnotes
