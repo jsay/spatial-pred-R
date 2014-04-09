@@ -4,8 +4,8 @@ This project is under construction
 
 * Documentation
 
-  Read the [[url:http://htmlpreview.github.io/?https://github.com/jsay/spatial-pred-R/blob/master/DOC.html][HTML version]], download the [[file:https:/github.com/jsay/spatial-pred-R/blob/master/DOC.pdf][PDF version]], or contribute to
-  the [[url:https://github.com/jsay/spatial-pred-R/blob/master/DOC.org][ORG version]].
+  Read the [[http://htmlpreview.github.io/?https://github.com/jsay/spatial-pred-R/blob/master/DOC.html][HTML version]], download the [[file:DOC.pdf][PDF version]], or contribute to
+  the [[file:DOC.org][ORG version]].
 
 * Dependencies
 
