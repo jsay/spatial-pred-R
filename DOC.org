@@ -11,37 +11,48 @@
 #+INFOJS_OPT:  view:t toc:t mouse:underline buttons:0 path:http://thomasf.github.io/solarized-css/org-info.min.js
 #+HTML_HEAD:   <link rel="stylesheet" type="text/css" href="http://thomasf.github.io/solarized-css/solarized-light.min.css" />
 #+BEGIN_abstract
-This repository presents some improvements of the =R= function used to
-make predictions from spatial models (=predict.sarlm=). The status is
-actually under construction: <2014-03-24 lun.>.\\
+This document presents a framework and some =R= code --
+[[latex:url][www.r-project.org]] -- to make predictions from spatial autoregressive
+models. In particular, it implements the predictors from LeSage and
+Pace (2004, 2008) and Kelejian and Prucha (2004) for a large number of
+autoregressive models from the =spdep= package (Bivand 2014). The
+status is actually under construction, comments are welcome.\\
 
 *TODO*
 - Code the variances and confidence intervals of predictors
-- The question of different weight matrix between lags and errors
-- Links with predictors from geostatistics (kriging)
-- Implement for objects form =sphet= and =splm=
-- Leave one out from LSP with simple computation, useful?
-
+- Allow different weight matrix between lags and errors
+- Code the predictors for objects form =sphet= and =splm=
 #+END_abstract
+#+BEGIN_LaTeX
+  \clearpage
+  \setcounter{tocdepth}{2}
+  \begin{spacing}{0.75}
+  \tableofcontents
+  \end{spacing}
+  \clearpage
+#+END_LaTeX
 
 # http://www.springerreference.com/docs/html/chapterdbid/62922.html
 
-* Getting started
-** Changes relative to current function
+* Major changes relative to =predict.sarlm=
 
-   - Implement predictions for SARAR and Mixed SARAR models
+   - Implement predictions for SARAR and Mixed SARAR models from
+     respectively =sac= and =sacmixed= classes.
    - Compute BLUP and almost BLUP spatial predictors
-
-** TODO Determine output structure
-** Changes in computational details
-
    - About the in-sample / out of sample structure (=newdata=)
-   - About the inclusion of the intercept in mixed models
    - About the distinction between trend and signal
    - The simplification of the in-sample predictions
 
-* Econometric Theory
-** Spatial Econometric Framework
+** About the intercept
+
+   We change the scan of the intercept, in particular in presence of
+   $WX$ in the regression. If $W$ is row standardized, we have to drop
+   the intercept to avoid collinearity. The initial function add the
+   constant at the end of the computations, we only drop the intercept
+   in the presence of $WX$.
+
+* Statistical Framework
+** Spatial Econometric
 
    From the more general from of the Cliff-Ord (1973, 1981)
    homoscedastic class of models with exogenous covariates,[fn:1]
@@ -61,6 +72,9 @@ y           & = \rho Wy+X\beta+\gamma WX+ \varepsilon\nonumber\\
    assume that $\mbox{diag}(W)= 0$, $\mid \rho \mid< 1$, $\mid \lambda
    \mid< 1$. /standardization of W?/ Not the same notations than
    KP 2007.
+
+   By construction, $W_{ii}$ \gt $0$ to preclude an observation from
+   directly predicting itself
 
    The geo-statistical models usually involve specifying spatial
    dependence through the error process as opposed to the spatial lag
@@ -88,6 +102,9 @@ y           & = \rho Wy+X\beta+\gamma WX+ \varepsilon\nonumber\\
 
    We develop a framework of prediction from models with
    interdependent observations.
+
+   We implement the KP1 predictors, also called exogenous by LeSage
+   and Pace.
 
    We have to explain the differences between in-sample, out-of-sample
    and ex-sample in a spatial context. Ex-sample is not necessary
@@ -132,7 +149,123 @@ library(spdep) ; predict.sarlm
   models. For that, we have to put =legacy=== =FALSE=. The signal is
   computed by difference for the lag models in out of sample.
 
-* The New Extension
+* The =sppred= extension
+** General Structure
+
+   Here is the general structure of the functions that call
+   sub-functions that are defined below.
+
+   This function contents the usual verifications, with 2 more
+   arguments: =cond.set= for the conditional set (see XX) and =mean=
+   for the specification of the structural mean.
+
+   The scan for the lagged WX is by the presence of "lag." at their
+   name, it has to be changed.
+
+#+begin_src R :results silent :tangle ./sppred.R
+sppred <- function(object, newdata = NULL, listw = NULL,
+                   zero.policy = NULL, condset = "X", avg = "DEF",
+                   legacy= TRUE, power= NULL, order= 250,
+                   tol= .Machine$double.eps^(3/5), ...) {
+    ## USUAL VERIFICATIONS
+    if (is.null(zero.policy)) 
+        zero.policy <- get("zeroPolicy", envir = spdep:::.spdepOptions)
+    stopifnot(is.logical(zero.policy))
+    if (is.null(power)) power <- object$method != "eigen"
+    stopifnot(is.logical(legacy)) ; stopifnot(is.logical(power))
+    ## DETERMINING THE MODEL
+    if (object$type== "error"){
+        mod <- ifelse(object$etype== "error", "sem", "sxm")
+    } else {
+        mod <- switch(object$type, "lag"= "sar", "mixed"= "sdm",
+                                   "sac"= "sac", "sacmixed"= "smc")
+    }
+    ## DATA SHAPING
+    Wlg <- substr(names(object$coefficients), 1, 4)== "lag."
+    B <- object$coefficients[ !Wlg]
+    if (is.null(newdata)){
+        nd  <- FALSE
+        X   <- object$X[, !Wlg]
+    } else {
+        nd  <- TRUE
+        frm <- formula(object$call)
+        mt  <- delete.response(terms(frm, data = newdata))
+        mf  <- model.frame(mt, newdata)
+        X   <- model.matrix(mt, mf)
+        if (any(object$aliased)) X <- X[, -which(object$aliased)]
+    }
+    ## WEIGHT MATRIX
+    if (!nd) lsw <- eval(object$call$listw) else lsw <- listw
+    ## THE PREDICTORS
+    if (condset== "X") prd <- as.vector(X %*% B)
+    if (condset== "XW")
+        prd <- prd1(object, mod, nd, B, X, lsw)
+    if (condset== "XW" && !mod %in% c("sem", "sxm") && avg == "INV")
+        prd <- prd2(object, prd, mod, lsw, power, order, tol)
+    if (condset== "XWe")
+        prd <- prd3(object, B, X, listw, power, legacy, order, tol)
+    if (condset== "XWy")
+        prd <- prd4(object, B, X, listw, power, legacy, order, tol)
+    if (condset== "XWc")
+        prd <- prd5(object, B, X, listw, power, legacy, order, tol)
+    class(prd) <- "sppred"
+    prd
+}
+#+end_src
+
+   we choose to not use =object$tarX= and =object$tarY= for more
+   transparencies. It is clear that we lost from that in terms of
+   computation time. It is easy to predict by conditioning only on "X"
+   because it is the same form for all the spatial models (see
+   equation XX).
+
+** Predictors conditioned on X, W
+*** without lagged endogenous
+
+#+begin_src R :results silent :tangle ./sppred.R
+prd1 <- function(object, mod= mod, nd= nd, B= B, X= X, lsw= lsw){
+    if (mod!= "sem" && nd){
+        if (is.null(lsw) || !inherits(lsw, "listw"))
+            stop("spatial weights list required")
+    }
+    if (mod %in% c("sxm", "sdm", "smc")){
+        m <- ncol(X)
+        K <- ifelse(colnames(object$X)[ 1] == "(Intercept)", 2, 1)
+        WX <- matrix(nrow= nrow(X), ncol= m+ 1- K)
+        for (k in K: m){
+            wx <- lag.listw(lsw, X[, k])
+            if (any(is.na(wx)))
+                stop("NAs in lagged independent variable")
+            WX[, k+ 1- K] <- wx
+        }
+        prdWX <- cbind(X, WX) %*% object$coefficients
+    } else {
+        prdWX <- X %*% B
+    }
+    as.vector(prdWX)
+}
+#+end_src
+
+*** With lagged endogenous
+
+#+begin_src R :results silent :tangle ./sppred.R
+prd2 <- function(object, prd= prd, mod= mod, lsw= lsw,
+                 power= power, order= order, tol= tol){
+    if (power){
+        W <- as(as_dgRMatrix_listw(lsw), "CsparseMatrix")
+        prdWXi <- c(as(powerWeights(W, rho= object$rho, X= prd,
+                                    order= order, tol= tol), "matrix"))
+    } else {
+        prdWXi <- c(invIrW(lsw, object$rho) %*% prd)
+    }
+    as.vector(prdWXi)
+}
+#+end_src
+
+** Predictors conditioned on X, W, e
+** Predictors conditioned on X, W, y
+** Predictors conditioned by hand
+* How it works
 ** Choosing a type of predictor
 
    Our new =R= function for spatial predictions -- called =sppred= for
@@ -165,6 +298,102 @@ library(spdep) ; predict.sarlm
 
 ** The predictors 1 for OS predictions   
 * Testing
+** Sample
+
+#+Name: Lst:PSS
+#+Header: :width 11 :height 4
+#+begin_src R :results graphics :file "Figures/PrsSpSmp.pdf"
+load("Data/exsmp.Rda") ; library(spdep)
+plot(exsmp$Dat.all)
+plot(exsmp$Dat.cal, col= "blue", pch= 20, add= TRUE)
+#+end_src
+
+#+Name: Fig:PSS
+#+ATTR_LaTeX: :options scale= .5
+#+Caption: Calibration and exhaustive datasets
+#+RESULTS: Lst:PSS
+[[file:Figures/PrsSpSmp.pdf]]
+ 
+** Estimating the spatial models
+
+#+begin_src R :results output exemple
+SEM <- errorsarlm(ARlog03~ PXLB03+ RTFO03+ BdAlti, data= exsmp$Dat.cal,
+                  exsmp$Wgt.cal, method= "eigen")
+SXM <- errorsarlm(ARlog03~ PXLB03+ RTFO03+ BdAlti, data= exsmp$Dat.cal,
+                  exsmp$Wgt.cal, method= "eigen", etype= "emixed")
+SAR <- lagsarlm(  ARlog03~ PXLB03+ RTFO03+ BdAlti, data= exsmp$Dat.cal,
+                  exsmp$Wgt.cal, method= "eigen")
+SDM <- lagsarlm(  ARlog03~ PXLB03+ RTFO03+ BdAlti, data= exsmp$Dat.cal,
+                  exsmp$Wgt.cal, method= "eigen", type= "mixed")
+SAC <- sacsarlm(  ARlog03~ PXLB03+ RTFO03+ BdAlti, data= exsmp$Dat.cal,
+                  exsmp$Wgt.cal, method= "eigen")
+SMC <- sacsarlm(  ARlog03~ PXLB03+ RTFO03+ BdAlti, data= exsmp$Dat.cal,
+                  exsmp$Wgt.cal, method= "eigen", type= "sacmixed")
+library(plyr)
+t(ldply(list(SEM, SXM, SAR, SDM, SAC, SMC), AIC))
+#+end_src
+
+#+RESULTS:
+:        [,1]     [,2]     [,3]     [,4]     [,5]    [,6]
+: V1 445.7127 433.3333 435.5886 434.1438 436.3016 435.197
+
+** Testing the predictors
+*** Conditioned on X
+
+#+begin_src R :results output exemple
+source("sppred.R")
+SEMprdX <- sppred(SEM, newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal)
+SXMprdX <- sppred(SXM)
+
+SARprdX <- sppred(SAR)
+SDMprdX <- sppred(SDM)
+SACprdX <- sppred(SAC)
+SMCprdX <- sppred(SMC)
+sqrt(mean(I(SEMprdX- SAR$y)^2))
+sqrt(mean(I(SXMprdX- SAR$y)^2))
+sqrt(mean(I(SARprdX- SAR$y)^2))
+sqrt(mean(I(SDMprdX- SAR$y)^2))
+sqrt(mean(I(SACprdX- SAR$y)^2))
+sqrt(mean(I(SMCprdX- SAR$y)^2))
+#+end_src
+
+*** Conditioned on X, W
+
+#+begin_src R :results output exemple
+source("sppred.R")
+SEMprdX <- sppred(SEM)
+SXMprdX <- sppred(SXM)
+SARprdX <- sppred(SAR)
+SDMprdX <- sppred(SDM)
+SACprdX <- sppred(SAC)
+SMCprdX <- sppred(SMC)
+SEMprdXW <- sppred(SEM, condset= "XW")
+SXMprdXW <- sppred(SXM, condset= "XW")
+SXMprdXWi <- sppred(SXM, condset= "XW", avg= "INV")
+SARprdXW <- sppred(SAR, condset= "XW")
+SARprdXWi <- sppred(SAR, condset= "XW", avg= "INV")
+SDMprdXW <- sppred(SDM, condset= "XW")
+SDMprdXWi <- sppred(SDM, condset= "XW", avg= "INV")
+SEMprdXW <- sppred(SEM, condset= "XW", avg= "INV")
+SEMprdXW <- sppred(SEM, condset= "XW",
+                   newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal)
+SXMprdXW <- sppred(SXM, condset= "XW",
+                   newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal)
+summary(SEMprdX)
+summary(SEMprdXW)
+SXMprdX <- sppred(SXM, condset= "XW")
+SXMprdXW <- sppred(SXM, newdata= exsmp$Dat.cal,
+                   condset= "XW", listw= exsmp$Wgt.cal)
+SARprdX <- sppred(SAR, condset= "X")
+SARprdXW <- sppred(SAR, condset= "XW")
+sqrt(mean(I(SEMprdX- SAR$y)^2))
+sqrt(mean(I(SXMprdX- SAR$y)^2))
+sqrt(mean(I(SARprdX- SAR$y)^2))
+sqrt(mean(I(SARprdXW- SAR$y)^2))
+sqrt(mean(I(SDMprdXWi- SAR$y)^2))
+sqrt(mean(I(SACprdX- SAR$y)^2))
+sqrt(mean(I(SMCprdX- SAR$y)^2))
+#+end_src
 
 * Footnotes
 
