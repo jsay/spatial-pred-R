@@ -1,8 +1,9 @@
 
-sppred <- function(object, newdata = NULL, listw = NULL,
-                   zero.policy = NULL, condset = "X", avg = "DEF",
-                   legacy= TRUE, power= NULL, order= 250,
+sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
+                   condset= "DEF", blup = NULL, loo = FALSE, power = NULL,
+                   zero.policy = NULL, legacy = TRUE, order = 250,
                    tol= .Machine$double.eps^(3/5), ...) {
+    require(spdep)
     ## USUAL VERIFICATIONS
     if (is.null(zero.policy)) 
         zero.policy <- get("zeroPolicy", envir = spdep:::.spdepOptions)
@@ -19,65 +20,108 @@ sppred <- function(object, newdata = NULL, listw = NULL,
     ## DATA SHAPING
     Wlg <- substr(names(object$coefficients), 1, 4)== "lag."
     B <- object$coefficients[ !Wlg]
+    if (mod %in% c("sem", "sxm")) {lab= object$lambda ; rho= 0         }
+    if (mod %in% c("sar", "sdm")) {lab= 0             ; rho= object$rho}
+    if (mod %in% c("sac", "smc")) {lab= object$lambda ; rho= object$rho}
     if (is.null(newdata)){
-        nd  <- FALSE
         X   <- object$X[, !Wlg]
     } else {
-        nd  <- TRUE
         frm <- formula(object$call)
         mt  <- delete.response(terms(frm, data = newdata))
         mf  <- model.frame(mt, newdata)
         X   <- model.matrix(mt, mf)
         if (any(object$aliased)) X <- X[, -which(object$aliased)]
     }
-    ## WEIGHT MATRIX
-    if (!nd) lsw <- eval(object$call$listw) else lsw <- listw
-    ## THE PREDICTORS
-    if (condset== "X") prd <- as.vector(X %*% B)
-    if (condset== "XW")
-        prd <- prd1(object, mod, nd, B, X, lsw)
-    if (condset== "XW" && !mod %in% c("sem", "sxm") && avg == "INV")
-        prd <- prd2(object, prd, mod, lsw, power, order, tol)
-    if (condset== "XWe")
-        prd <- prd3(object, B, X, listw, power, legacy, order, tol)
-    if (condset== "XWy")
-        prd <- prd4(object, B, X, listw, power, legacy, order, tol)
-    if (condset== "XWc")
-        prd <- prd5(object, B, X, listw, power, legacy, order, tol)
-    class(prd) <- "sppred"
-    prd
-}
-
-prd1 <- function(object, mod= mod, nd= nd, B= B, X= X, lsw= lsw){
-    if (mod!= "sem" && nd){
-        if (is.null(lsw) || !inherits(lsw, "listw"))
-            stop("spatial weights list required")
-    }
-    if (mod %in% c("sxm", "sdm", "smc")){
-        m <- ncol(X)
-        K <- ifelse(colnames(object$X)[ 1] == "(Intercept)", 2, 1)
-        WX <- matrix(nrow= nrow(X), ncol= m+ 1- K)
-        for (k in K: m){
-            wx <- lag.listw(lsw, X[, k])
-            if (any(is.na(wx)))
-                stop("NAs in lagged independent variable")
-            WX[, k+ 1- K] <- wx
-        }
-        prdWX <- cbind(X, WX) %*% object$coefficients
+    ## WEIGHT MATRIX, add an error message
+    if (is.null(listw)) lsw <- eval(object$call$listw) else lsw <- listw
+    ## PREDICTORS
+    if (is.null(blup)){
+        pt <- switch(condset, "X"= 1, "XW"= 2, "DEF"= 3, "XWy"= 4)
     } else {
-        prdWX <- X %*% B
+        pt <- switch(blup, "LSP"= 5, "KP2"= 6, "KP3"= 7, "KPG"= 8)
     }
-    as.vector(prdWX)
+    prdX <- as.vector(X %*% B) ; print(pt)
+    if (pt> 1) prdWX   <- prdWX(object, X, prdX, mod, lsw)
+    if (pt> 2) prdKP1  <- prdKP1(prdWX, rho, lsw, power, order, tol)
+    if (pt> 3 && pt!= 4){
+        prdWXy <- prdWX+
+            rho* lag.listw(lsw, yobs)+ lab* lag.listw(lsw, yobs- prdWX)}
+    if (pt==5) prdLSP <- prdLSP(prdKP1, rho, lab, lsw, yobs, loo)
+    if (pt> 5 && !loo) stop("Set loo= TRUE for this blup predictor")
+    if (pt==6){
+        prdKP2 <- prdKP2(prdKP1, prdWXy,
+                         rho, lab, lsw, yobs, power, order, tol)}
+    if (pt==7) prdKP3 <- prdKP3(object, prd, mod, B, X, lsw, yobs)
+    if (pt==8) prdKPG <- prdKPG(mod, lsw, power, legacy, order, tol)
+    prd <- switch(pt, "1"= prdX, "2"= prdWX, "3"= prdKP1, "4"= prdWXy,
+                      "5"= prdLSP, "6"= prdKP2, "7"= prdKP3, "8"= prdKPG)
+    class(prd) <- "sppred" ; as.vector(prd)
 }
 
-prd2 <- function(object, prd= prd, mod= mod, lsw= lsw,
-                 power= power, order= order, tol= tol){
+prdWX <- function(object, X= X, prdX= prdX, mod= mod, lsw= lsw){
+    if (mod %in% c("sxm", "sdm", "smc")){
+        K <- ifelse(colnames(X)[ 1] == "(Intercept)", 2, 1)
+        m <- ncol(X) ; WX <- matrix(nrow= length(prdX), ncol= m+ 1- K)
+        for (k in K: m){
+            WX[, k+ 1- K] <- lag.listw(lsw, X[, k])
+        }
+        prdWX <- prdX+ (WX %*% object$coefficients[ m+ 1+ 0: (m- K)])
+    } else prdWX <- prdX
+   prdWX
+}
+
+prdKP1 <- function(prdWX, rho= rho, lsw= lsw,
+                   power= power, order= order, tol= tol){
     if (power){
         W <- as(as_dgRMatrix_listw(lsw), "CsparseMatrix")
-        prdWXi <- c(as(powerWeights(W, rho= object$rho, X= prd,
+        prdKP1 <- c(as(powerWeights(W, rho= rho, X= prdWX,
                                     order= order, tol= tol), "matrix"))
     } else {
-        prdWXi <- c(invIrW(lsw, object$rho) %*% prd)
+        prdKP1 <- c(invIrW(lsw, rho) %*% prdWX)
     }
-    as.vector(prdWXi)
+    prdKP1
+}
+
+prdLSP <- function(prdKP1, rho= rho, lab= lab,
+                   lsw= lsw, yobs= yobs, loo= loo){
+    ZL <- diag(length(prdKP1))- (lab* listw2mat(lsw))
+    ZR <- diag(length(prdKP1))- (rho* listw2mat(lsw))
+    Z  <- ZL %*% ZR ; P22 <- t(Z) %*% Z
+    if (loo){
+        prdLSP <- matrix(NA, ncol= 1, nrow= length(prdKP1))
+        for (i in 1: length(prdKP1)){
+            prdLSP[ i] <- prdKP1[ i]-
+                (P22[-i, i] %*% (yobs[ -i]- prdKP1[ -i])/ P22[i, i])
+        }
+    } else {
+        P11 <- P22
+        prdLSP <- prdKP1+ ((solve(P22) %*% P11 %*% (yobs- prdKP1)))
+    }
+    prdLSP
+}
+
+prdKP2 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
+                   yobs= yobs, power= power, order= order, tol= tol){
+    if (power){
+        W <- as(as_dgRMatrix_listw(lsw), "CsparseMatrix")
+        GL <- as(powerWeights(W, rho= lab, order= order, tol= tol,
+                              X= diag(length(prdWXy))), "matrix")
+        GR <- as(powerWeights(W, rho= rho, order= order, tol= tol,
+                              X= diag(length(prdWXy))), "matrix")
+    } else {
+        GL <- invIrW(lsw, rho) ; GR <- invIrW(lsw, lab)
+    }
+    sum.u <- GL %*% t(GL) ; sum.y <- GR %*% sum.u %*% t(GR)
+    WM <- listw2mat(lsw)
+    prdKP2 <- matrix(NA, ncol= 1, nrow= length(prdWXy))
+    for (i in 1: length(prdKP2)){
+        rg <- (sum.u[i, ] %*% GR %*% WM[i, ])/ (WM[i, ] %*% sum.y %*% WM[i, ])
+        prdKP2[ i] <- prdWXy[ i]+ (rg %*% WM[i, ] %*% (yobs- prdKP1))
+    }
+    prdKP2
+}
+
+prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
+                   yobs= yobs, power= power, order= order, tol= tol){
+    prdKP3
 }

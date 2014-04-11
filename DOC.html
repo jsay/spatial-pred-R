@@ -3,10 +3,10 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Extending Predictions from Spatial Econometric Models on R</title>
-<!-- 2014-04-09 mer. 19:05 -->
+<!-- 2014-04-11 ven. 22:56 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="author" content="Jean-Sauveur AY \\ \lt[[mailto:jsay.site@gmail.com][jsay.site@gmail.com]]jsay.site@gmail.com\gt \and Julie LE GALLO\\ \lt[[mailto:jlegallo@univ-fcomte.fr][jlegallo@univ-fcomte.fr\gt]]jlegallo@univ-fcomte.fr\gt"/>
+<meta name="author" content="Jean-Sauveur AY \\ \lt[[mailto:jsay.site@gmail.com][jsay.site@gmail.com]]jsay.site@gmail.com\gt \and Julie LE GALLO\\ \lt[[mailto:jlegallo@univ-fcomte.fr][jlegallo@univ-fcomte.fr]]jlegallo@univ-fcomte.fr\gt"/>
 <style type="text/css">
  <!--/*--><![CDATA[/*><!--*/
   .title  { text-align: center; }
@@ -258,7 +258,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-1-1">1.1. About the intercept</a></li>
 </ul>
 </li>
-<li><a href="#sec-2">2. Statistical Framework</a>
+<li><a href="#sec-2">2. Theoretical Framework</a>
 <ul>
 <li><a href="#sec-2-1">2.1. Spatial Econometric</a></li>
 <li><a href="#sec-2-2">2.2. Making Predictions</a></li>
@@ -270,13 +270,19 @@ for the JavaScript code in this tag.
 <li><a href="#sec-4-1">4.1. General Structure</a></li>
 <li><a href="#sec-4-2">4.2. Predictors conditioned on X, W</a>
 <ul>
-<li><a href="#sec-4-2-1">4.2.1. without lagged endogenous</a></li>
-<li><a href="#sec-4-2-2">4.2.2. With lagged endogenous</a></li>
+<li><a href="#sec-4-2-1">4.2.1. exogenous predictor</a></li>
+<li><a href="#sec-4-2-2">4.2.2. endogenous predictor</a></li>
 </ul>
 </li>
-<li><a href="#sec-4-3">4.3. Predictors conditioned on X, W, e</a></li>
-<li><a href="#sec-4-4">4.4. Predictors conditioned on X, W, y</a></li>
-<li><a href="#sec-4-5">4.5. Predictors conditioned by hand</a></li>
+<li><a href="#sec-4-3">4.3. Predictors conditioned on X, W, y</a>
+<ul>
+<li><a href="#sec-4-3-1">4.3.1. biased predictors</a></li>
+<li><a href="#sec-4-3-2">4.3.2. BLUP LSP</a></li>
+<li><a href="#sec-4-3-3">4.3.3. BLUP KP2</a></li>
+<li><a href="#sec-4-3-4">4.3.4. BLUP KP3</a></li>
+</ul>
+</li>
+<li><a href="#sec-4-4">4.4. Predictors conditioned by hand</a></li>
 </ul>
 </li>
 <li><a href="#sec-5">5. How it works</a>
@@ -295,6 +301,10 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-6-3-1">6.3.1. Conditioned on X</a></li>
 <li><a href="#sec-6-3-2">6.3.2. Conditioned on X, W</a></li>
+<li><a href="#sec-6-3-3">6.3.3. KP1 predictors</a></li>
+<li><a href="#sec-6-3-4">6.3.4. Biased predictor</a></li>
+<li><a href="#sec-6-3-5">6.3.5. LSP predictor</a></li>
+<li><a href="#sec-6-3-6">6.3.6. KP2 predictor</a></li>
 </ul>
 </li>
 </ul>
@@ -308,8 +318,10 @@ This document presents a framework and some <code>R</code> code &#x2013;
 &#x2013; to make predictions from spatial autoregressive
 models. In particular, it implements the predictors from LeSage and
 Pace (2004, 2008) and Kelejian and Prucha (2004) for a large number of
-autoregressive models from the <code>spdep</code> package (Bivand 2014). The
-status is actually under construction, comments are welcome.<br/>
+autoregressive models from the <code>spdep</code> package (Bivand 2014). To use
+this code, save the file <code>sppred.R</code> in your working directory then
+enter: <code>source("sppred.R")</code>. The status is actually under
+construction, comments are welcome.<br/>
 </p>
 
 <p>
@@ -320,7 +332,7 @@ status is actually under construction, comments are welcome.<br/>
 </li>
 <li>Allow different weight matrix between lags and errors
 </li>
-<li>Code the predictors for objects form <code>sphet</code> and <code>splm</code>
+<li>Code the predictors for <code>sphet</code> and <code>splm</code> objects
 </li>
 </ul>
 
@@ -358,11 +370,25 @@ in the presence of \(WX\).
 </div>
 </div>
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2"><span class="section-number-2">2</span> Statistical Framework</h2>
+<h2 id="sec-2"><span class="section-number-2">2</span> Theoretical Framework</h2>
 <div class="outline-text-2" id="text-2">
 </div><div id="outline-container-sec-2-1" class="outline-3">
 <h3 id="sec-2-1"><span class="section-number-3">2.1</span> Spatial Econometric</h3>
 <div class="outline-text-3" id="text-2-1">
+<p>
+When considering predicting from spatial econometric models, the
+first point is to recognize that observations are structurally
+interdependent and neighboring observation can improve the quality
+of predictions. Hence, the usual distinction between in-sample (IS)
+and out-of-sample (OS) predictions has firstly to be refined. It is
+not simply inside our outside the calibration sample but it has
+also some relations (or not) with it. The literature about
+predicting from spatial econometric models is not really unified
+(see XX for the most significant), and one can consider this note
+as an attempt, with the associated practical framework implemented
+in <code>R</code>.
+</p>
+
 <p>
 From the more general from of the Cliff-Ord (1973, 1981)
 homoscedastic class of models with exogenous covariates,<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
@@ -514,16 +540,22 @@ for the specification of the structural mean.
 </p>
 
 <p>
+It is important that the same predictor is implemented when
+newdata are NULL or not, as when spatial matrix set.
+</p>
+
+<p>
 The scan for the lagged WX is by the presence of "lag." at their
 name, it has to be changed.
 </p>
 
 <div class="org-src-container">
 
-<pre class="src src-R"><span style="color: #ff1493;">sppred</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(object, newdata = <span style="color: #D8FA3C;">NULL</span>, listw = <span style="color: #D8FA3C;">NULL</span>,
-                   zero.policy = <span style="color: #D8FA3C;">NULL</span>, condset = <span style="color: #61CE3C;">"X"</span>, avg = <span style="color: #61CE3C;">"DEF"</span>,
-                   legacy= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">NULL</span>, order= 250,
+<pre class="src src-R"><span style="color: #ff1493;">sppred</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(object, newdata = <span style="color: #D8FA3C;">NULL</span>, listw = <span style="color: #D8FA3C;">NULL</span>, yobs= object$y,
+                   condset= <span style="color: #61CE3C;">"DEF"</span>, blup = <span style="color: #D8FA3C;">NULL</span>, loo = <span style="color: #D8FA3C;">FALSE</span>, power = <span style="color: #D8FA3C;">NULL</span>,
+                   zero.policy = <span style="color: #D8FA3C;">NULL</span>, legacy = <span style="color: #D8FA3C;">TRUE</span>, order = 250,
                    tol= .Machine$double.eps^(3/5), ...) {
+    <span style="color: #4c83ff;">require</span>(spdep)
     <span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">USUAL VERIFICATIONS</span>
     <span style="color: #FBDE2D;">if</span> (is.null(zero.policy)) 
         zero.policy <span style="color: #4c83ff;">&lt;-</span> get(<span style="color: #61CE3C;">"zeroPolicy"</span>, envir = spdep:::.spdepOptions)
@@ -540,33 +572,42 @@ name, it has to be changed.
     <span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">DATA SHAPING</span>
     Wlg <span style="color: #4c83ff;">&lt;-</span> substr(names(object$coefficients), 1, 4)== <span style="color: #61CE3C;">"lag."</span>
     B <span style="color: #4c83ff;">&lt;-</span> object$coefficients[ !Wlg]
+    <span style="color: #FBDE2D;">if</span> (mod %<span style="color: #FBDE2D;">in</span>% c(<span style="color: #61CE3C;">"sem"</span>, <span style="color: #61CE3C;">"sxm"</span>)) {lab= object$lambda ; rho= 0         }
+    <span style="color: #FBDE2D;">if</span> (mod %<span style="color: #FBDE2D;">in</span>% c(<span style="color: #61CE3C;">"sar"</span>, <span style="color: #61CE3C;">"sdm"</span>)) {lab= 0             ; rho= object$rho}
+    <span style="color: #FBDE2D;">if</span> (mod %<span style="color: #FBDE2D;">in</span>% c(<span style="color: #61CE3C;">"sac"</span>, <span style="color: #61CE3C;">"smc"</span>)) {lab= object$lambda ; rho= object$rho}
     <span style="color: #FBDE2D;">if</span> (is.null(newdata)){
-        nd  <span style="color: #4c83ff;">&lt;-</span> <span style="color: #D8FA3C;">FALSE</span>
         X   <span style="color: #4c83ff;">&lt;-</span> object$X[, !Wlg]
     } <span style="color: #FBDE2D;">else</span> {
-        nd  <span style="color: #4c83ff;">&lt;-</span> <span style="color: #D8FA3C;">TRUE</span>
         frm <span style="color: #4c83ff;">&lt;-</span> formula(object$call)
         mt  <span style="color: #4c83ff;">&lt;-</span> delete.response(terms(frm, data = newdata))
         mf  <span style="color: #4c83ff;">&lt;-</span> model.frame(mt, newdata)
         X   <span style="color: #4c83ff;">&lt;-</span> model.matrix(mt, mf)
         <span style="color: #FBDE2D;">if</span> (any(object$aliased)) X <span style="color: #4c83ff;">&lt;-</span> X[, -which(object$aliased)]
     }
-    <span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">WEIGHT MATRIX</span>
-    <span style="color: #FBDE2D;">if</span> (!nd) lsw <span style="color: #4c83ff;">&lt;-</span> eval(object$call$listw) <span style="color: #FBDE2D;">else</span> lsw <span style="color: #4c83ff;">&lt;-</span> listw
-    <span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">THE PREDICTORS</span>
-    <span style="color: #FBDE2D;">if</span> (condset== <span style="color: #61CE3C;">"X"</span>) prd <span style="color: #4c83ff;">&lt;-</span> as.vector(X %*% B)
-    <span style="color: #FBDE2D;">if</span> (condset== <span style="color: #61CE3C;">"XW"</span>)
-        prd <span style="color: #4c83ff;">&lt;-</span> prd1(object, mod, nd, B, X, lsw)
-    <span style="color: #FBDE2D;">if</span> (condset== <span style="color: #61CE3C;">"XW"</span> &amp;&amp; !mod %<span style="color: #FBDE2D;">in</span>% c(<span style="color: #61CE3C;">"sem"</span>, <span style="color: #61CE3C;">"sxm"</span>) &amp;&amp; avg == <span style="color: #61CE3C;">"INV"</span>)
-        prd <span style="color: #4c83ff;">&lt;-</span> prd2(object, prd, mod, lsw, power, order, tol)
-    <span style="color: #FBDE2D;">if</span> (condset== <span style="color: #61CE3C;">"XWe"</span>)
-        prd <span style="color: #4c83ff;">&lt;-</span> prd3(object, B, X, listw, power, legacy, order, tol)
-    <span style="color: #FBDE2D;">if</span> (condset== <span style="color: #61CE3C;">"XWy"</span>)
-        prd <span style="color: #4c83ff;">&lt;-</span> prd4(object, B, X, listw, power, legacy, order, tol)
-    <span style="color: #FBDE2D;">if</span> (condset== <span style="color: #61CE3C;">"XWc"</span>)
-        prd <span style="color: #4c83ff;">&lt;-</span> prd5(object, B, X, listw, power, legacy, order, tol)
-    class(prd) <span style="color: #4c83ff;">&lt;-</span> <span style="color: #61CE3C;">"sppred"</span>
-    prd
+    <span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">WEIGHT MATRIX, add an error message</span>
+    <span style="color: #FBDE2D;">if</span> (is.null(listw)) lsw <span style="color: #4c83ff;">&lt;-</span> eval(object$call$listw) <span style="color: #FBDE2D;">else</span> lsw <span style="color: #4c83ff;">&lt;-</span> listw
+    <span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">PREDICTORS</span>
+    <span style="color: #FBDE2D;">if</span> (is.null(blup)){
+        pt <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">switch</span>(condset, <span style="color: #61CE3C;">"X"</span>= 1, <span style="color: #61CE3C;">"XW"</span>= 2, <span style="color: #61CE3C;">"DEF"</span>= 3, <span style="color: #61CE3C;">"XWy"</span>= 4)
+    } <span style="color: #FBDE2D;">else</span> {
+        pt <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">switch</span>(blup, <span style="color: #61CE3C;">"LSP"</span>= 5, <span style="color: #61CE3C;">"KP2"</span>= 6, <span style="color: #61CE3C;">"KP3"</span>= 7, <span style="color: #61CE3C;">"KPG"</span>= 8)
+    }
+    prdX <span style="color: #4c83ff;">&lt;-</span> as.vector(X %*% B) ; print(pt)
+    <span style="color: #FBDE2D;">if</span> (pt&gt; 1) prdWX   <span style="color: #4c83ff;">&lt;-</span> prdWX(object, X, prdX, mod, lsw)
+    <span style="color: #FBDE2D;">if</span> (pt&gt; 2) prdKP1  <span style="color: #4c83ff;">&lt;-</span> prdKP1(prdWX, rho, lsw, power, order, tol)
+    <span style="color: #FBDE2D;">if</span> (pt&gt; 3 &amp;&amp; pt!= 4){
+        prdWXy <span style="color: #4c83ff;">&lt;-</span> prdWX+
+            rho* lag.listw(lsw, yobs)+ lab* lag.listw(lsw, yobs- prdWX)}
+    <span style="color: #FBDE2D;">if</span> (pt==5) prdLSP <span style="color: #4c83ff;">&lt;-</span> prdLSP(prdKP1, rho, lab, lsw, yobs, loo)
+    <span style="color: #FBDE2D;">if</span> (pt&gt; 5 &amp;&amp; !loo) <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"Set loo= TRUE for this blup predictor"</span>)
+    <span style="color: #FBDE2D;">if</span> (pt==6){
+        prdKP2 <span style="color: #4c83ff;">&lt;-</span> prdKP2(prdKP1, prdWXy,
+                         rho, lab, lsw, yobs, power, order, tol)}
+    <span style="color: #FBDE2D;">if</span> (pt==7) prdKP3 <span style="color: #4c83ff;">&lt;-</span> prdKP3(object, prd, mod, B, X, lsw, yobs)
+    <span style="color: #FBDE2D;">if</span> (pt==8) prdKPG <span style="color: #4c83ff;">&lt;-</span> prdKPG(mod, lsw, power, legacy, order, tol)
+    prd <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">switch</span>(pt, <span style="color: #61CE3C;">"1"</span>= prdX, <span style="color: #61CE3C;">"2"</span>= prdWX, <span style="color: #61CE3C;">"3"</span>= prdKP1, <span style="color: #61CE3C;">"4"</span>= prdWXy,
+                      <span style="color: #61CE3C;">"5"</span>= prdLSP, <span style="color: #61CE3C;">"6"</span>= prdKP2, <span style="color: #61CE3C;">"7"</span>= prdKP3, <span style="color: #61CE3C;">"8"</span>= prdKPG)
+    class(prd) <span style="color: #4c83ff;">&lt;-</span> <span style="color: #61CE3C;">"sppred"</span> ; as.vector(prd)
 }
 </pre>
 </div>
@@ -584,50 +625,40 @@ equation XX).
 <h3 id="sec-4-2"><span class="section-number-3">4.2</span> Predictors conditioned on X, W</h3>
 <div class="outline-text-3" id="text-4-2">
 </div><div id="outline-container-sec-4-2-1" class="outline-4">
-<h4 id="sec-4-2-1"><span class="section-number-4">4.2.1</span> without lagged endogenous</h4>
+<h4 id="sec-4-2-1"><span class="section-number-4">4.2.1</span> exogenous predictor</h4>
 <div class="outline-text-4" id="text-4-2-1">
 <div class="org-src-container">
 
-<pre class="src src-R"><span style="color: #ff1493;">prd1</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(object, mod= mod, nd= nd, B= B, X= X, lsw= lsw){
-    <span style="color: #FBDE2D;">if</span> (mod!= <span style="color: #61CE3C;">"sem"</span> &amp;&amp; nd){
-        <span style="color: #FBDE2D;">if</span> (is.null(lsw) || !inherits(lsw, <span style="color: #61CE3C;">"listw"</span>))
-            <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"spatial weights list required"</span>)
-    }
+<pre class="src src-R"><span style="color: #ff1493;">prdWX</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(object, X= X, prdX= prdX, mod= mod, lsw= lsw){
     <span style="color: #FBDE2D;">if</span> (mod %<span style="color: #FBDE2D;">in</span>% c(<span style="color: #61CE3C;">"sxm"</span>, <span style="color: #61CE3C;">"sdm"</span>, <span style="color: #61CE3C;">"smc"</span>)){
-        m <span style="color: #4c83ff;">&lt;-</span> ncol(X)
-        K <span style="color: #4c83ff;">&lt;-</span> ifelse(colnames(object$X)[ 1] == <span style="color: #61CE3C;">"(Intercept)"</span>, 2, 1)
-        WX <span style="color: #4c83ff;">&lt;-</span> matrix(nrow= nrow(X), ncol= m+ 1- K)
+        K <span style="color: #4c83ff;">&lt;-</span> ifelse(colnames(X)[ 1] == <span style="color: #61CE3C;">"(Intercept)"</span>, 2, 1)
+        m <span style="color: #4c83ff;">&lt;-</span> ncol(X) ; WX <span style="color: #4c83ff;">&lt;-</span> matrix(nrow= length(prdX), ncol= m+ 1- K)
         <span style="color: #FBDE2D;">for</span> (k <span style="color: #FBDE2D;">in</span> K: m){
-            wx <span style="color: #4c83ff;">&lt;-</span> lag.listw(lsw, X[, k])
-            <span style="color: #FBDE2D;">if</span> (any(is.na(wx)))
-                <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"NAs in lagged independent variable"</span>)
-            WX[, k+ 1- K] <span style="color: #4c83ff;">&lt;-</span> wx
+            WX[, k+ 1- K] <span style="color: #4c83ff;">&lt;-</span> lag.listw(lsw, X[, k])
         }
-        prdWX <span style="color: #4c83ff;">&lt;-</span> cbind(X, WX) %*% object$coefficients
-    } <span style="color: #FBDE2D;">else</span> {
-        prdWX <span style="color: #4c83ff;">&lt;-</span> X %*% B
-    }
-    as.vector(prdWX)
+        prdWX <span style="color: #4c83ff;">&lt;-</span> prdX+ (WX %*% object$coefficients[ m+ 1+ 0: (m- K)])
+    } <span style="color: #FBDE2D;">else</span> prdWX <span style="color: #4c83ff;">&lt;-</span> prdX
+   prdWX
 }
 </pre>
 </div>
 </div>
 </div>
 <div id="outline-container-sec-4-2-2" class="outline-4">
-<h4 id="sec-4-2-2"><span class="section-number-4">4.2.2</span> With lagged endogenous</h4>
+<h4 id="sec-4-2-2"><span class="section-number-4">4.2.2</span> endogenous predictor</h4>
 <div class="outline-text-4" id="text-4-2-2">
 <div class="org-src-container">
 
-<pre class="src src-R"><span style="color: #ff1493;">prd2</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(object, prd= prd, mod= mod, lsw= lsw,
-                 power= power, order= order, tol= tol){
+<pre class="src src-R"><span style="color: #ff1493;">prdKP1</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(prdWX, rho= rho, lsw= lsw,
+                   power= power, order= order, tol= tol){
     <span style="color: #FBDE2D;">if</span> (power){
         W <span style="color: #4c83ff;">&lt;-</span> as(as_dgRMatrix_listw(lsw), <span style="color: #61CE3C;">"CsparseMatrix"</span>)
-        prdWXi <span style="color: #4c83ff;">&lt;-</span> c(as(powerWeights(W, rho= object$rho, X= prd,
+        prdKP1 <span style="color: #4c83ff;">&lt;-</span> c(as(powerWeights(W, rho= rho, X= prdWX,
                                     order= order, tol= tol), <span style="color: #61CE3C;">"matrix"</span>))
     } <span style="color: #FBDE2D;">else</span> {
-        prdWXi <span style="color: #4c83ff;">&lt;-</span> c(invIrW(lsw, object$rho) %*% prd)
+        prdKP1 <span style="color: #4c83ff;">&lt;-</span> c(invIrW(lsw, rho) %*% prdWX)
     }
-    as.vector(prdWXi)
+    prdKP1
 }
 </pre>
 </div>
@@ -635,13 +666,96 @@ equation XX).
 </div>
 </div>
 <div id="outline-container-sec-4-3" class="outline-3">
-<h3 id="sec-4-3"><span class="section-number-3">4.3</span> Predictors conditioned on X, W, e</h3>
+<h3 id="sec-4-3"><span class="section-number-3">4.3</span> Predictors conditioned on X, W, y</h3>
+<div class="outline-text-3" id="text-4-3">
+</div><div id="outline-container-sec-4-3-1" class="outline-4">
+<h4 id="sec-4-3-1"><span class="section-number-4">4.3.1</span> biased predictors</h4>
+<div class="outline-text-4" id="text-4-3-1">
+<p>
+The predictors equivalent to KP4 and KP5, we do not let the choice
+(because the omitted combination can be recovered from previous
+predictors) and we can eventually add a KP6 for SAC and SMC
+models. The computations are in the general.
+</p>
 </div>
+</div>
+<div id="outline-container-sec-4-3-2" class="outline-4">
+<h4 id="sec-4-3-2"><span class="section-number-4">4.3.2</span> BLUP LSP</h4>
+<div class="outline-text-4" id="text-4-3-2">
+<p>
+It can make sens to distinguish one shot to one leave one.
+</p>
+
+
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #ff1493;">prdLSP</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(prdKP1, rho= rho, lab= lab,
+                   lsw= lsw, yobs= yobs, loo= loo){
+    ZL <span style="color: #4c83ff;">&lt;-</span> diag(length(prdKP1))- (lab* listw2mat(lsw))
+    ZR <span style="color: #4c83ff;">&lt;-</span> diag(length(prdKP1))- (rho* listw2mat(lsw))
+    Z  <span style="color: #4c83ff;">&lt;-</span> ZL %*% ZR ; P22 <span style="color: #4c83ff;">&lt;-</span> t(Z) %*% Z
+    <span style="color: #FBDE2D;">if</span> (loo){
+        prdLSP <span style="color: #4c83ff;">&lt;-</span> matrix(<span style="color: #D8FA3C;">NA</span>, ncol= 1, nrow= length(prdKP1))
+        <span style="color: #FBDE2D;">for</span> (i <span style="color: #FBDE2D;">in</span> 1: length(prdKP1)){
+            prdLSP[ i] <span style="color: #4c83ff;">&lt;-</span> prdKP1[ i]-
+                (P22[-i, i] %*% (yobs[ -i]- prdKP1[ -i])/ P22[i, i])
+        }
+    } <span style="color: #FBDE2D;">else</span> {
+        P11 <span style="color: #4c83ff;">&lt;-</span> P22
+        prdLSP <span style="color: #4c83ff;">&lt;-</span> prdKP1+ ((solve(P22) %*% P11 %*% (yobs- prdKP1)))
+    }
+    prdLSP
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-3-3" class="outline-4">
+<h4 id="sec-4-3-3"><span class="section-number-4">4.3.3</span> BLUP KP2</h4>
+<div class="outline-text-4" id="text-4-3-3">
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #ff1493;">prdKP2</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
+                   yobs= yobs, power= power, order= order, tol= tol){
+    <span style="color: #FBDE2D;">if</span> (power){
+        W <span style="color: #4c83ff;">&lt;-</span> as(as_dgRMatrix_listw(lsw), <span style="color: #61CE3C;">"CsparseMatrix"</span>)
+        GL <span style="color: #4c83ff;">&lt;-</span> as(powerWeights(W, rho= lab, order= order, tol= tol,
+                              X= diag(length(prdWXy))), <span style="color: #61CE3C;">"matrix"</span>)
+        GR <span style="color: #4c83ff;">&lt;-</span> as(powerWeights(W, rho= rho, order= order, tol= tol,
+                              X= diag(length(prdWXy))), <span style="color: #61CE3C;">"matrix"</span>)
+    } <span style="color: #FBDE2D;">else</span> {
+        GL <span style="color: #4c83ff;">&lt;-</span> invIrW(lsw, rho) ; GR <span style="color: #4c83ff;">&lt;-</span> invIrW(lsw, lab)
+    }
+    sum.u <span style="color: #4c83ff;">&lt;-</span> GL %*% t(GL) ; sum.y <span style="color: #4c83ff;">&lt;-</span> GR %*% sum.u %*% t(GR)
+    WM <span style="color: #4c83ff;">&lt;-</span> listw2mat(lsw)
+    prdKP2 <span style="color: #4c83ff;">&lt;-</span> matrix(<span style="color: #D8FA3C;">NA</span>, ncol= 1, nrow= length(prdWXy))
+    <span style="color: #FBDE2D;">for</span> (i <span style="color: #FBDE2D;">in</span> 1: length(prdKP2)){
+        rg <span style="color: #4c83ff;">&lt;-</span> (sum.u[i, ] %*% GR %*% WM[i, ])/ (WM[i, ] %*% sum.y %*% WM[i, ])
+        prdKP2[ i] <span style="color: #4c83ff;">&lt;-</span> prdWXy[ i]+ (rg %*% WM[i, ] %*% (yobs- prdKP1))
+    }
+    prdKP2
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-3-4" class="outline-4">
+<h4 id="sec-4-3-4"><span class="section-number-4">4.3.4</span> BLUP KP3</h4>
+<div class="outline-text-4" id="text-4-3-4">
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #ff1493;">prdKP3</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
+                   yobs= yobs, power= power, order= order, tol= tol){
+    prdKP3
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+
 <div id="outline-container-sec-4-4" class="outline-3">
-<h3 id="sec-4-4"><span class="section-number-3">4.4</span> Predictors conditioned on X, W, y</h3>
-</div>
-<div id="outline-container-sec-4-5" class="outline-3">
-<h3 id="sec-4-5"><span class="section-number-3">4.5</span> Predictors conditioned by hand</h3>
+<h3 id="sec-4-4"><span class="section-number-3">4.4</span> Predictors conditioned by hand</h3>
 </div>
 </div>
 
@@ -785,19 +899,22 @@ V1 445.7127 433.3333 435.5886 434.1438 436.3016 435.197
 <div class="org-src-container">
 
 <pre class="src src-R"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"sppred.R"</span>)
-SEMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SEM, newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal)
-SXMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SXM)
-
-SARprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SAR)
-SDMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SDM)
-SACprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SAC)
-SMCprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SMC)
-sqrt(mean(I(SEMprdX- SAR$y)^2))
-sqrt(mean(I(SXMprdX- SAR$y)^2))
+SEMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SEM, condset= <span style="color: #61CE3C;">"X"</span>)
+sqrt(mean(I(SEMprdX- SEM$y)^2))
+SXMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, condset= <span style="color: #61CE3C;">"X"</span>)
+sqrt(mean(I(SXMprdX- SXM$y)^2))
+SARprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SAR, condset= <span style="color: #61CE3C;">"X"</span>)
 sqrt(mean(I(SARprdX- SAR$y)^2))
-sqrt(mean(I(SDMprdX- SAR$y)^2))
-sqrt(mean(I(SACprdX- SAR$y)^2))
-sqrt(mean(I(SMCprdX- SAR$y)^2))
+SDMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SDM, condset= <span style="color: #61CE3C;">"X"</span>)
+sqrt(mean(I(SDMprdX- SDM$y)^2))
+SACprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SAC, condset= <span style="color: #61CE3C;">"X"</span>)
+sqrt(mean(I(SACprdX- SAC$y)^2))
+SMCprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SMC, condset= <span style="color: #61CE3C;">"X"</span>)
+sqrt(mean(I(SMCprdX- SMC$y)^2))
+SMCprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SMC, newdata= exsmp$Dat.cal, condset= <span style="color: #61CE3C;">"X"</span>, power= T)
+sqrt(mean(I(SMCprdX- SMC$y)^2))
+
+<span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">A ESSAYER AVEC L'AUTRE BASE SPATIALE</span>
 </pre>
 </div>
 </div>
@@ -808,38 +925,140 @@ sqrt(mean(I(SMCprdX- SAR$y)^2))
 <div class="org-src-container">
 
 <pre class="src src-R"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"sppred.R"</span>)
-SEMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SEM)
-SXMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SXM)
-SARprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SAR)
-SDMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SDM)
-SACprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SAC)
-SMCprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SMC)
-SEMprdXW <span style="color: #4c83ff;">&lt;-</span> sppred(SEM, condset= <span style="color: #61CE3C;">"XW"</span>)
-SXMprdXW <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, condset= <span style="color: #61CE3C;">"XW"</span>)
-SXMprdXWi <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, condset= <span style="color: #61CE3C;">"XW"</span>, avg= <span style="color: #61CE3C;">"INV"</span>)
-SARprdXW <span style="color: #4c83ff;">&lt;-</span> sppred(SAR, condset= <span style="color: #61CE3C;">"XW"</span>)
-SARprdXWi <span style="color: #4c83ff;">&lt;-</span> sppred(SAR, condset= <span style="color: #61CE3C;">"XW"</span>, avg= <span style="color: #61CE3C;">"INV"</span>)
-SDMprdXW <span style="color: #4c83ff;">&lt;-</span> sppred(SDM, condset= <span style="color: #61CE3C;">"XW"</span>)
-SDMprdXWi <span style="color: #4c83ff;">&lt;-</span> sppred(SDM, condset= <span style="color: #61CE3C;">"XW"</span>, avg= <span style="color: #61CE3C;">"INV"</span>)
-SEMprdXW <span style="color: #4c83ff;">&lt;-</span> sppred(SEM, condset= <span style="color: #61CE3C;">"XW"</span>, avg= <span style="color: #61CE3C;">"INV"</span>)
-SEMprdXW <span style="color: #4c83ff;">&lt;-</span> sppred(SEM, condset= <span style="color: #61CE3C;">"XW"</span>,
-                   newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal)
-SXMprdXW <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, condset= <span style="color: #61CE3C;">"XW"</span>,
-                   newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal)
-summary(SEMprdX)
-summary(SEMprdXW)
-SXMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, condset= <span style="color: #61CE3C;">"XW"</span>)
+SEMprdWX <span style="color: #4c83ff;">&lt;-</span> sppred(SEM, condset= <span style="color: #61CE3C;">"XW"</span>)
+sqrt(mean(I(SEMprdWX- SEM$y)^2))
+SXMprdWX <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, condset= <span style="color: #61CE3C;">"XW"</span>)
+sqrt(mean(I(SXMprdWX- SXM$y)^2))
+SARprdWX <span style="color: #4c83ff;">&lt;-</span> sppred(SAR, condset= <span style="color: #61CE3C;">"XW"</span>)
+sqrt(mean(I(SARprdWX- SAR$y)^2))
+SDMprdWX <span style="color: #4c83ff;">&lt;-</span> sppred(SDM, condset= <span style="color: #61CE3C;">"XW"</span>)
+sqrt(mean(I(SDMprdWX- SAR$y)^2))
+SACprdWX <span style="color: #4c83ff;">&lt;-</span> sppred(SAC, condset= <span style="color: #61CE3C;">"XW"</span>)
+sqrt(mean(I(SACprdWX- SAR$y)^2))
+SMCprdWX <span style="color: #4c83ff;">&lt;-</span> sppred(SMC, condset= <span style="color: #61CE3C;">"XW"</span>)
+sqrt(mean(I(SMCprdWX- SAR$y)^2))
 SXMprdXW <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, newdata= exsmp$Dat.cal,
                    condset= <span style="color: #61CE3C;">"XW"</span>, listw= exsmp$Wgt.cal)
-SARprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SAR, condset= <span style="color: #61CE3C;">"X"</span>)
-SARprdXW <span style="color: #4c83ff;">&lt;-</span> sppred(SAR, condset= <span style="color: #61CE3C;">"XW"</span>)
-sqrt(mean(I(SEMprdX- SAR$y)^2))
-sqrt(mean(I(SXMprdX- SAR$y)^2))
-sqrt(mean(I(SARprdX- SAR$y)^2))
-sqrt(mean(I(SARprdXW- SAR$y)^2))
-sqrt(mean(I(SDMprdXWi- SAR$y)^2))
-sqrt(mean(I(SACprdX- SAR$y)^2))
-sqrt(mean(I(SMCprdX- SAR$y)^2))
+sqrt(mean(I(SXMprdWX- SXM$y)^2))
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-3-3" class="outline-4">
+<h4 id="sec-6-3-3"><span class="section-number-4">6.3.3</span> KP1 predictors</h4>
+<div class="outline-text-4" id="text-6-3-3">
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"sppred.R"</span>)
+SEMprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SEM)
+sqrt(mean(I(SEMprdKP1- SEM$y)^2))
+SXMprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SXM)
+sqrt(mean(I(SXMprdKP1- SXM$y)^2))
+SARprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SAR)
+sqrt(mean(I(SARprdKP1- SAR$y)^2))
+SDMprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SDM)
+sqrt(mean(I(SDMprdKP1- SAR$y)^2))
+SACprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SAC)
+sqrt(mean(I(SACprdKP1- SAR$y)^2))
+SMCprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SMC)
+sqrt(mean(I(SMCprdKP1- SAR$y)^2))
+
+SXMprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, newdata= exsmp$Dat.cal)
+sqrt(mean(I(SXMprdKP1- SXM$y)^2))
+SXMprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, power= <span style="color: #D8FA3C;">TRUE</span>)
+SXMprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal)
+SXMprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal,
+                    power= <span style="color: #D8FA3C;">TRUE</span>)
+sqrt(mean(I(SXMprdKP1- SXM$y)^2))
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-3-4" class="outline-4">
+<h4 id="sec-6-3-4"><span class="section-number-4">6.3.4</span> Biased predictor</h4>
+<div class="outline-text-4" id="text-6-3-4">
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"sppred.R"</span>)
+SEMprdXWy <span style="color: #4c83ff;">&lt;-</span> sppred(SEM, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sqrt(mean(I(SEMprdXWy- SEM$y)^2))
+SXMprdXWy <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sqrt(mean(I(SXMprdXWy- SXM$y)^2))
+SARprdXWy <span style="color: #4c83ff;">&lt;-</span> sppred(SAR, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sqrt(mean(I(SARprdXWy- SAR$y)^2))
+SDMprdXWy <span style="color: #4c83ff;">&lt;-</span> sppred(SDM, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sqrt(mean(I(SDMprdXWy- SDM$y)^2))
+SACprdXWy <span style="color: #4c83ff;">&lt;-</span> sppred(SAC, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sqrt(mean(I(SACprdXWy- SAC$y)^2))
+SMCprdXWy <span style="color: #4c83ff;">&lt;-</span> sppred(SMC, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sqrt(mean(I(SMCprdXWy- SMC$y)^2))
+
+SDMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SDM, condset= <span style="color: #61CE3C;">"XWy"</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
+SDMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SDM, condset= <span style="color: #61CE3C;">"XWy"</span>, newdata= exsmp$Dat.cal)
+sqrt(mean(I(SDMprdXWy- SDM$y)^2))
+
+<span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">ON PEUT COMMENCER A METTRE DU yobs choisit</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-3-5" class="outline-4">
+<h4 id="sec-6-3-5"><span class="section-number-4">6.3.5</span> LSP predictor</h4>
+<div class="outline-text-4" id="text-6-3-5">
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"sppred.R"</span>)
+SEMprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SEM, blup= <span style="color: #61CE3C;">"LSP"</span>)
+sqrt(mean(I(SEMprdKP1- SEM$y)^2))
+
+SEMprdKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(SEM, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sqrt(mean(I(SEMprdKP1- SEM$y)^2))
+
+
+SXMprdXWy <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sqrt(mean(I(SXMprdXWy- SXM$y)^2))
+
+SARprdXWy <span style="color: #4c83ff;">&lt;-</span> sppred(SAR, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sqrt(mean(I(SARprdXWy- SAR$y)^2))
+SDMprdXWy <span style="color: #4c83ff;">&lt;-</span> sppred(SDM, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sqrt(mean(I(SDMprdXWy- SDM$y)^2))
+SACprdXWy <span style="color: #4c83ff;">&lt;-</span> sppred(SAC, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sqrt(mean(I(SACprdXWy- SAC$y)^2))
+SMCprdXWy <span style="color: #4c83ff;">&lt;-</span> sppred(SMC, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sqrt(mean(I(SMCprdXWy- SMC$y)^2))
+
+SDMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SDM, condset= <span style="color: #61CE3C;">"XWy"</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
+SDMprdX <span style="color: #4c83ff;">&lt;-</span> sppred(SDM, condset= <span style="color: #61CE3C;">"XWy"</span>, newdata= exsmp$Dat.cal)
+sqrt(mean(I(SDMprdXWy- SDM$y)^2))
+
+<span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">ON PEUT COMMENCER A METTRE DU yobs choisit</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-3-6" class="outline-4">
+<h4 id="sec-6-3-6"><span class="section-number-4">6.3.6</span> KP2 predictor</h4>
+<div class="outline-text-4" id="text-6-3-6">
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"sppred.R"</span>)
+SEMprdKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(SEM, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sqrt(mean(I(SEMprdKP2- SEM$y)^2))
+SXMprdKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(SXM, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sqrt(mean(I(SXMprdKP2- SXM$y)^2))
+SARprdKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(SAR, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sqrt(mean(I(SARprdKP2- SAR$y)^2))
+SDMprdKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(SDM, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sqrt(mean(I(SDMprdKP2- SDM$y)^2))
+SACprdKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(SAC, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sqrt(mean(I(SACprdKP2- SAC$y)^2))
+SMCprdKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(SMC, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sqrt(mean(I(SMCprdKP2- SMC$y)^2))
+
+SMCprdKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(SMC, condset= <span style="color: #61CE3C;">"X"</span>, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sqrt(mean(I(SMCprdKP2- SMC$y)^2))
+
+<span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">ON PEUT COMMENCER A METTRE DU yobs choisit</span>
 </pre>
 </div>
 </div>

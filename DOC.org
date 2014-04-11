@@ -1,5 +1,5 @@
 #+TITLE:       Extending Predictions from Spatial Econometric Models on R
-#+AUTHOR:      Jean-Sauveur AY \\ \lt[[mailto:jsay.site@gmail.com][jsay.site@gmail.com]]\gt \and Julie LE GALLO\\ \lt[[mailto:jlegallo@univ-fcomte.fr][jlegallo@univ-fcomte.fr\gt]] 
+#+AUTHOR:      Jean-Sauveur AY \\ \lt[[mailto:jsay.site@gmail.com][jsay.site@gmail.com]]\gt \and Julie LE GALLO\\ \lt[[mailto:jlegallo@univ-fcomte.fr][jlegallo@univ-fcomte.fr]]\gt 
 #+LaTeX_CLASS: ManueStat
 #+OPTIONS:     LaTeX:t tags:nil toc:nil H:5
 #+STARTUP:     hideblocks
@@ -15,13 +15,15 @@ This document presents a framework and some =R= code --
 [[latex:url][www.r-project.org]] -- to make predictions from spatial autoregressive
 models. In particular, it implements the predictors from LeSage and
 Pace (2004, 2008) and Kelejian and Prucha (2004) for a large number of
-autoregressive models from the =spdep= package (Bivand 2014). The
-status is actually under construction, comments are welcome.\\
+autoregressive models from the =spdep= package (Bivand 2014). To use
+this code, save the file =sppred.R= in your working directory then
+enter: =source("sppred.R")=. The status is actually under
+construction, comments are welcome.\\
 
 *TODO*
 - Code the variances and confidence intervals of predictors
 - Allow different weight matrix between lags and errors
-- Code the predictors for objects form =sphet= and =splm=
+- Code the predictors for =sphet= and =splm= objects
 #+END_abstract
 #+BEGIN_LaTeX
   \clearpage
@@ -51,8 +53,20 @@ status is actually under construction, comments are welcome.\\
    constant at the end of the computations, we only drop the intercept
    in the presence of $WX$.
 
-* Statistical Framework
+* Theoretical Framework
 ** Spatial Econometric
+
+   When considering predicting from spatial econometric models, the
+   first point is to recognize that observations are structurally
+   interdependent and neighboring observation can improve the quality
+   of predictions. Hence, the usual distinction between in-sample (IS)
+   and out-of-sample (OS) predictions has firstly to be refined. It is
+   not simply inside our outside the calibration sample but it has
+   also some relations (or not) with it. The literature about
+   predicting from spatial econometric models is not really unified
+   (see XX for the most significant), and one can consider this note
+   as an attempt, with the associated practical framework implemented
+   in =R=.
 
    From the more general from of the Cliff-Ord (1973, 1981)
    homoscedastic class of models with exogenous covariates,[fn:1]
@@ -159,14 +173,18 @@ library(spdep) ; predict.sarlm
    arguments: =cond.set= for the conditional set (see XX) and =mean=
    for the specification of the structural mean.
 
+   It is important that the same predictor is implemented when
+   newdata are NULL or not, as when spatial matrix set.
+
    The scan for the lagged WX is by the presence of "lag." at their
    name, it has to be changed.
 
 #+begin_src R :results silent :tangle ./sppred.R
-sppred <- function(object, newdata = NULL, listw = NULL,
-                   zero.policy = NULL, condset = "X", avg = "DEF",
-                   legacy= TRUE, power= NULL, order= 250,
+sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
+                   condset= "DEF", blup = NULL, loo = FALSE, power = NULL,
+                   zero.policy = NULL, legacy = TRUE, order = 250,
                    tol= .Machine$double.eps^(3/5), ...) {
+    require(spdep)
     ## USUAL VERIFICATIONS
     if (is.null(zero.policy)) 
         zero.policy <- get("zeroPolicy", envir = spdep:::.spdepOptions)
@@ -183,33 +201,42 @@ sppred <- function(object, newdata = NULL, listw = NULL,
     ## DATA SHAPING
     Wlg <- substr(names(object$coefficients), 1, 4)== "lag."
     B <- object$coefficients[ !Wlg]
+    if (mod %in% c("sem", "sxm")) {lab= object$lambda ; rho= 0         }
+    if (mod %in% c("sar", "sdm")) {lab= 0             ; rho= object$rho}
+    if (mod %in% c("sac", "smc")) {lab= object$lambda ; rho= object$rho}
     if (is.null(newdata)){
-        nd  <- FALSE
         X   <- object$X[, !Wlg]
     } else {
-        nd  <- TRUE
         frm <- formula(object$call)
         mt  <- delete.response(terms(frm, data = newdata))
         mf  <- model.frame(mt, newdata)
         X   <- model.matrix(mt, mf)
         if (any(object$aliased)) X <- X[, -which(object$aliased)]
     }
-    ## WEIGHT MATRIX
-    if (!nd) lsw <- eval(object$call$listw) else lsw <- listw
-    ## THE PREDICTORS
-    if (condset== "X") prd <- as.vector(X %*% B)
-    if (condset== "XW")
-        prd <- prd1(object, mod, nd, B, X, lsw)
-    if (condset== "XW" && !mod %in% c("sem", "sxm") && avg == "INV")
-        prd <- prd2(object, prd, mod, lsw, power, order, tol)
-    if (condset== "XWe")
-        prd <- prd3(object, B, X, listw, power, legacy, order, tol)
-    if (condset== "XWy")
-        prd <- prd4(object, B, X, listw, power, legacy, order, tol)
-    if (condset== "XWc")
-        prd <- prd5(object, B, X, listw, power, legacy, order, tol)
-    class(prd) <- "sppred"
-    prd
+    ## WEIGHT MATRIX, add an error message
+    if (is.null(listw)) lsw <- eval(object$call$listw) else lsw <- listw
+    ## PREDICTORS
+    if (is.null(blup)){
+        pt <- switch(condset, "X"= 1, "XW"= 2, "DEF"= 3, "XWy"= 4)
+    } else {
+        pt <- switch(blup, "LSP"= 5, "KP2"= 6, "KP3"= 7, "KPG"= 8)
+    }
+    prdX <- as.vector(X %*% B) ; print(pt)
+    if (pt> 1) prdWX   <- prdWX(object, X, prdX, mod, lsw)
+    if (pt> 2) prdKP1  <- prdKP1(prdWX, rho, lsw, power, order, tol)
+    if (pt> 3 && pt!= 4){
+        prdWXy <- prdWX+
+            rho* lag.listw(lsw, yobs)+ lab* lag.listw(lsw, yobs- prdWX)}
+    if (pt==5) prdLSP <- prdLSP(prdKP1, rho, lab, lsw, yobs, loo)
+    if (pt> 5 && !loo) stop("Set loo= TRUE for this blup predictor")
+    if (pt==6){
+        prdKP2 <- prdKP2(prdKP1, prdWXy,
+                         rho, lab, lsw, yobs, power, order, tol)}
+    if (pt==7) prdKP3 <- prdKP3(object, prd, mod, B, X, lsw, yobs)
+    if (pt==8) prdKPG <- prdKPG(mod, lsw, power, legacy, order, tol)
+    prd <- switch(pt, "1"= prdX, "2"= prdWX, "3"= prdKP1, "4"= prdWXy,
+                      "5"= prdLSP, "6"= prdKP2, "7"= prdKP3, "8"= prdKPG)
+    class(prd) <- "sppred" ; as.vector(prd)
 }
 #+end_src
 
@@ -220,50 +247,106 @@ sppred <- function(object, newdata = NULL, listw = NULL,
    equation XX).
 
 ** Predictors conditioned on X, W
-*** without lagged endogenous
+*** exogenous predictor
 
 #+begin_src R :results silent :tangle ./sppred.R
-prd1 <- function(object, mod= mod, nd= nd, B= B, X= X, lsw= lsw){
-    if (mod!= "sem" && nd){
-        if (is.null(lsw) || !inherits(lsw, "listw"))
-            stop("spatial weights list required")
-    }
+prdWX <- function(object, X= X, prdX= prdX, mod= mod, lsw= lsw){
     if (mod %in% c("sxm", "sdm", "smc")){
-        m <- ncol(X)
-        K <- ifelse(colnames(object$X)[ 1] == "(Intercept)", 2, 1)
-        WX <- matrix(nrow= nrow(X), ncol= m+ 1- K)
+        K <- ifelse(colnames(X)[ 1] == "(Intercept)", 2, 1)
+        m <- ncol(X) ; WX <- matrix(nrow= length(prdX), ncol= m+ 1- K)
         for (k in K: m){
-            wx <- lag.listw(lsw, X[, k])
-            if (any(is.na(wx)))
-                stop("NAs in lagged independent variable")
-            WX[, k+ 1- K] <- wx
+            WX[, k+ 1- K] <- lag.listw(lsw, X[, k])
         }
-        prdWX <- cbind(X, WX) %*% object$coefficients
-    } else {
-        prdWX <- X %*% B
-    }
-    as.vector(prdWX)
+        prdWX <- prdX+ (WX %*% object$coefficients[ m+ 1+ 0: (m- K)])
+    } else prdWX <- prdX
+   prdWX
 }
 #+end_src
 
-*** With lagged endogenous
+*** endogenous predictor
 
 #+begin_src R :results silent :tangle ./sppred.R
-prd2 <- function(object, prd= prd, mod= mod, lsw= lsw,
-                 power= power, order= order, tol= tol){
+prdKP1 <- function(prdWX, rho= rho, lsw= lsw,
+                   power= power, order= order, tol= tol){
     if (power){
         W <- as(as_dgRMatrix_listw(lsw), "CsparseMatrix")
-        prdWXi <- c(as(powerWeights(W, rho= object$rho, X= prd,
+        prdKP1 <- c(as(powerWeights(W, rho= rho, X= prdWX,
                                     order= order, tol= tol), "matrix"))
     } else {
-        prdWXi <- c(invIrW(lsw, object$rho) %*% prd)
+        prdKP1 <- c(invIrW(lsw, rho) %*% prdWX)
     }
-    as.vector(prdWXi)
+    prdKP1
 }
 #+end_src
 
-** Predictors conditioned on X, W, e
 ** Predictors conditioned on X, W, y
+*** biased predictors
+
+    The predictors equivalent to KP4 and KP5, we do not let the choice
+    (because the omitted combination can be recovered from previous
+    predictors) and we can eventually add a KP6 for SAC and SMC
+    models. The computations are in the general.
+
+*** BLUP LSP
+
+    It can make sens to distinguish one shot to one leave one.
+
+
+#+begin_src R :results silent :tangle ./sppred.R
+prdLSP <- function(prdKP1, rho= rho, lab= lab,
+                   lsw= lsw, yobs= yobs, loo= loo){
+    ZL <- diag(length(prdKP1))- (lab* listw2mat(lsw))
+    ZR <- diag(length(prdKP1))- (rho* listw2mat(lsw))
+    Z  <- ZL %*% ZR ; P22 <- t(Z) %*% Z
+    if (loo){
+        prdLSP <- matrix(NA, ncol= 1, nrow= length(prdKP1))
+        for (i in 1: length(prdKP1)){
+            prdLSP[ i] <- prdKP1[ i]-
+                (P22[-i, i] %*% (yobs[ -i]- prdKP1[ -i])/ P22[i, i])
+        }
+    } else {
+        P11 <- P22
+        prdLSP <- prdKP1+ ((solve(P22) %*% P11 %*% (yobs- prdKP1)))
+    }
+    prdLSP
+}
+#+end_src
+
+*** BLUP KP2
+
+#+begin_src R :results silent :tangle ./sppred.R
+prdKP2 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
+                   yobs= yobs, power= power, order= order, tol= tol){
+    if (power){
+        W <- as(as_dgRMatrix_listw(lsw), "CsparseMatrix")
+        GL <- as(powerWeights(W, rho= lab, order= order, tol= tol,
+                              X= diag(length(prdWXy))), "matrix")
+        GR <- as(powerWeights(W, rho= rho, order= order, tol= tol,
+                              X= diag(length(prdWXy))), "matrix")
+    } else {
+        GL <- invIrW(lsw, rho) ; GR <- invIrW(lsw, lab)
+    }
+    sum.u <- GL %*% t(GL) ; sum.y <- GR %*% sum.u %*% t(GR)
+    WM <- listw2mat(lsw)
+    prdKP2 <- matrix(NA, ncol= 1, nrow= length(prdWXy))
+    for (i in 1: length(prdKP2)){
+        rg <- (sum.u[i, ] %*% GR %*% WM[i, ])/ (WM[i, ] %*% sum.y %*% WM[i, ])
+        prdKP2[ i] <- prdWXy[ i]+ (rg %*% WM[i, ] %*% (yobs- prdKP1))
+    }
+    prdKP2
+}
+#+end_src
+
+*** BLUP KP3
+
+#+begin_src R :results silent :tangle ./sppred.R
+prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
+                   yobs= yobs, power= power, order= order, tol= tol){
+    prdKP3
+}
+#+end_src
+
+
 ** Predictors conditioned by hand
 * How it works
 ** Choosing a type of predictor
@@ -342,58 +425,149 @@ t(ldply(list(SEM, SXM, SAR, SDM, SAC, SMC), AIC))
 
 #+begin_src R :results output exemple
 source("sppred.R")
-SEMprdX <- sppred(SEM, newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal)
-SXMprdX <- sppred(SXM)
-
-SARprdX <- sppred(SAR)
-SDMprdX <- sppred(SDM)
-SACprdX <- sppred(SAC)
-SMCprdX <- sppred(SMC)
-sqrt(mean(I(SEMprdX- SAR$y)^2))
-sqrt(mean(I(SXMprdX- SAR$y)^2))
+SEMprdX <- sppred(SEM, condset= "X")
+sqrt(mean(I(SEMprdX- SEM$y)^2))
+SXMprdX <- sppred(SXM, condset= "X")
+sqrt(mean(I(SXMprdX- SXM$y)^2))
+SARprdX <- sppred(SAR, condset= "X")
 sqrt(mean(I(SARprdX- SAR$y)^2))
-sqrt(mean(I(SDMprdX- SAR$y)^2))
-sqrt(mean(I(SACprdX- SAR$y)^2))
-sqrt(mean(I(SMCprdX- SAR$y)^2))
+SDMprdX <- sppred(SDM, condset= "X")
+sqrt(mean(I(SDMprdX- SDM$y)^2))
+SACprdX <- sppred(SAC, condset= "X")
+sqrt(mean(I(SACprdX- SAC$y)^2))
+SMCprdX <- sppred(SMC, condset= "X")
+sqrt(mean(I(SMCprdX- SMC$y)^2))
+SMCprdX <- sppred(SMC, newdata= exsmp$Dat.cal, condset= "X", power= T)
+sqrt(mean(I(SMCprdX- SMC$y)^2))
+
+## A ESSAYER AVEC L'AUTRE BASE SPATIALE
 #+end_src
 
 *** Conditioned on X, W
 
 #+begin_src R :results output exemple
 source("sppred.R")
-SEMprdX <- sppred(SEM)
-SXMprdX <- sppred(SXM)
-SARprdX <- sppred(SAR)
-SDMprdX <- sppred(SDM)
-SACprdX <- sppred(SAC)
-SMCprdX <- sppred(SMC)
-SEMprdXW <- sppred(SEM, condset= "XW")
-SXMprdXW <- sppred(SXM, condset= "XW")
-SXMprdXWi <- sppred(SXM, condset= "XW", avg= "INV")
-SARprdXW <- sppred(SAR, condset= "XW")
-SARprdXWi <- sppred(SAR, condset= "XW", avg= "INV")
-SDMprdXW <- sppred(SDM, condset= "XW")
-SDMprdXWi <- sppred(SDM, condset= "XW", avg= "INV")
-SEMprdXW <- sppred(SEM, condset= "XW", avg= "INV")
-SEMprdXW <- sppred(SEM, condset= "XW",
-                   newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal)
-SXMprdXW <- sppred(SXM, condset= "XW",
-                   newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal)
-summary(SEMprdX)
-summary(SEMprdXW)
-SXMprdX <- sppred(SXM, condset= "XW")
+SEMprdWX <- sppred(SEM, condset= "XW")
+sqrt(mean(I(SEMprdWX- SEM$y)^2))
+SXMprdWX <- sppred(SXM, condset= "XW")
+sqrt(mean(I(SXMprdWX- SXM$y)^2))
+SARprdWX <- sppred(SAR, condset= "XW")
+sqrt(mean(I(SARprdWX- SAR$y)^2))
+SDMprdWX <- sppred(SDM, condset= "XW")
+sqrt(mean(I(SDMprdWX- SAR$y)^2))
+SACprdWX <- sppred(SAC, condset= "XW")
+sqrt(mean(I(SACprdWX- SAR$y)^2))
+SMCprdWX <- sppred(SMC, condset= "XW")
+sqrt(mean(I(SMCprdWX- SAR$y)^2))
 SXMprdXW <- sppred(SXM, newdata= exsmp$Dat.cal,
                    condset= "XW", listw= exsmp$Wgt.cal)
-SARprdX <- sppred(SAR, condset= "X")
-SARprdXW <- sppred(SAR, condset= "XW")
-sqrt(mean(I(SEMprdX- SAR$y)^2))
-sqrt(mean(I(SXMprdX- SAR$y)^2))
-sqrt(mean(I(SARprdX- SAR$y)^2))
-sqrt(mean(I(SARprdXW- SAR$y)^2))
-sqrt(mean(I(SDMprdXWi- SAR$y)^2))
-sqrt(mean(I(SACprdX- SAR$y)^2))
-sqrt(mean(I(SMCprdX- SAR$y)^2))
+sqrt(mean(I(SXMprdWX- SXM$y)^2))
 #+end_src
+
+*** KP1 predictors
+
+#+begin_src R :results output exemple
+source("sppred.R")
+SEMprdKP1 <- sppred(SEM)
+sqrt(mean(I(SEMprdKP1- SEM$y)^2))
+SXMprdKP1 <- sppred(SXM)
+sqrt(mean(I(SXMprdKP1- SXM$y)^2))
+SARprdKP1 <- sppred(SAR)
+sqrt(mean(I(SARprdKP1- SAR$y)^2))
+SDMprdKP1 <- sppred(SDM)
+sqrt(mean(I(SDMprdKP1- SAR$y)^2))
+SACprdKP1 <- sppred(SAC)
+sqrt(mean(I(SACprdKP1- SAR$y)^2))
+SMCprdKP1 <- sppred(SMC)
+sqrt(mean(I(SMCprdKP1- SAR$y)^2))
+
+SXMprdKP1 <- sppred(SXM, newdata= exsmp$Dat.cal)
+sqrt(mean(I(SXMprdKP1- SXM$y)^2))
+SXMprdKP1 <- sppred(SXM, power= TRUE)
+SXMprdKP1 <- sppred(SXM, newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal)
+SXMprdKP1 <- sppred(SXM, newdata= exsmp$Dat.cal, listw= exsmp$Wgt.cal,
+                    power= TRUE)
+sqrt(mean(I(SXMprdKP1- SXM$y)^2))
+
+#+end_src
+
+*** Biased predictor
+
+#+begin_src R :results output exemple
+source("sppred.R")
+SEMprdXWy <- sppred(SEM, condset= "XWy")
+sqrt(mean(I(SEMprdXWy- SEM$y)^2))
+SXMprdXWy <- sppred(SXM, condset= "XWy")
+sqrt(mean(I(SXMprdXWy- SXM$y)^2))
+SARprdXWy <- sppred(SAR, condset= "XWy")
+sqrt(mean(I(SARprdXWy- SAR$y)^2))
+SDMprdXWy <- sppred(SDM, condset= "XWy")
+sqrt(mean(I(SDMprdXWy- SDM$y)^2))
+SACprdXWy <- sppred(SAC, condset= "XWy")
+sqrt(mean(I(SACprdXWy- SAC$y)^2))
+SMCprdXWy <- sppred(SMC, condset= "XWy")
+sqrt(mean(I(SMCprdXWy- SMC$y)^2))
+
+SDMprdX <- sppred(SDM, condset= "XWy", power= TRUE)
+SDMprdX <- sppred(SDM, condset= "XWy", newdata= exsmp$Dat.cal)
+sqrt(mean(I(SDMprdXWy- SDM$y)^2))
+
+## ON PEUT COMMENCER A METTRE DU yobs choisit
+#+end_src
+
+*** LSP predictor
+
+#+begin_src R :results output exemple
+source("sppred.R")
+SEMprdKP1 <- sppred(SEM, blup= "LSP")
+sqrt(mean(I(SEMprdKP1- SEM$y)^2))
+
+SEMprdKP1 <- sppred(SEM, blup= "LSP", loo= TRUE)
+sqrt(mean(I(SEMprdKP1- SEM$y)^2))
+
+
+SXMprdXWy <- sppred(SXM, blup= "LSP", loo= TRUE)
+sqrt(mean(I(SXMprdXWy- SXM$y)^2))
+
+SARprdXWy <- sppred(SAR, condset= "XWy")
+sqrt(mean(I(SARprdXWy- SAR$y)^2))
+SDMprdXWy <- sppred(SDM, condset= "XWy")
+sqrt(mean(I(SDMprdXWy- SDM$y)^2))
+SACprdXWy <- sppred(SAC, condset= "XWy")
+sqrt(mean(I(SACprdXWy- SAC$y)^2))
+SMCprdXWy <- sppred(SMC, condset= "XWy")
+sqrt(mean(I(SMCprdXWy- SMC$y)^2))
+
+SDMprdX <- sppred(SDM, condset= "XWy", power= TRUE)
+SDMprdX <- sppred(SDM, condset= "XWy", newdata= exsmp$Dat.cal)
+sqrt(mean(I(SDMprdXWy- SDM$y)^2))
+
+## ON PEUT COMMENCER A METTRE DU yobs choisit
+#+end_src
+
+*** KP2 predictor
+
+#+begin_src R :results output exemple
+source("sppred.R")
+SEMprdKP2 <- sppred(SEM, blup= "KP2", loo= TRUE)
+sqrt(mean(I(SEMprdKP2- SEM$y)^2))
+SXMprdKP2 <- sppred(SXM, blup= "KP2", loo= TRUE)
+sqrt(mean(I(SXMprdKP2- SXM$y)^2))
+SARprdKP2 <- sppred(SAR, blup= "KP2", loo= TRUE)
+sqrt(mean(I(SARprdKP2- SAR$y)^2))
+SDMprdKP2 <- sppred(SDM, blup= "KP2", loo= TRUE)
+sqrt(mean(I(SDMprdKP2- SDM$y)^2))
+SACprdKP2 <- sppred(SAC, blup= "KP2", loo= TRUE)
+sqrt(mean(I(SACprdKP2- SAC$y)^2))
+SMCprdKP2 <- sppred(SMC, blup= "KP2", loo= TRUE)
+sqrt(mean(I(SMCprdKP2- SMC$y)^2))
+
+SMCprdKP2 <- sppred(SMC, condset= "X", blup= "KP2", loo= TRUE)
+sqrt(mean(I(SMCprdKP2- SMC$y)^2))
+
+## ON PEUT COMMENCER A METTRE DU yobs choisit
+#+end_src
+
 
 * Footnotes
 
