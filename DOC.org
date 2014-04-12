@@ -8,108 +8,157 @@
 #+PROPERTY:    session *R*
 #+PROPERTY:    exports both
 #+PROPERTY:    eval no
-#+INFOJS_OPT:  view:t toc:t mouse:underline buttons:0 path:http://thomasf.github.io/solarized-css/org-info.min.js
+#+INFOJS_OPT:  view:showall toc:nil ltoc:nil mouse:underline path:http://thomasf.github.io/solarized-css/org-info.min.js
 #+HTML_HEAD:   <link rel="stylesheet" type="text/css" href="http://thomasf.github.io/solarized-css/solarized-light.min.css" />
+#+HTML_HEAD:   <base target="_blank">
 #+BEGIN_abstract
-This document presents a framework and some =R= code --
-[[latex:url][www.r-project.org]] -- to make predictions from spatial autoregressive
-models. In particular, it implements the predictors from LeSage and
-Pace (2004, 2008) and Kelejian and Prucha (2004) for a large number of
-autoregressive models from the =spdep= package (Bivand 2014). To use
-this code, save the file =sppred.R= in your working directory then
-enter: =source("sppred.R")=. The status is actually under
-construction, comments are welcome.\\
+This document presents an integrative framework to make predictions
+from spatial autoregressive models (Cliff and Ord 1973, 1981; Anselin
+1988). It also contains the corresponding [[url:http://www.r-project.org][=R= code]] to implement the
+predictors presented. The code is gathered into the [[./sppred.R][=sppred=]] function
+that implements in particular the predictors from LeSage and Pace
+(2004, 2008) and Kelejian and Prucha (2004) for a large number of
+specifications of spatial autocorrelation from the [[url:http://cran.r-project.org/web/packages/spdep/index.html][=spdep= package]]
+(Bivand 2014). To use this code, save the file [[./sppred.R][=sppred=]] in your
+working directory then submit =source("sppred.R")= to =R=. Some
+examples on the =boston= data are also available at section XX. The
+status of this work is actually under construction, comments are
+welcome.\\
 
-*TODO*
+*=STILL TODO=* 
 - Code the variances and confidence intervals of predictors
-- Allow different weight matrix between lags and errors
+- Code the predictors for ex-sample predictions
 - Code the predictors for =sphet= and =splm= objects
 #+END_abstract
-#+BEGIN_LaTeX
-  \clearpage
-  \setcounter{tocdepth}{2}
-  \begin{spacing}{0.75}
-  \tableofcontents
-  \end{spacing}
-  \clearpage
-#+END_LaTeX
-
-# http://www.springerreference.com/docs/html/chapterdbid/62922.html
-
-* Major changes relative to =predict.sarlm=
-
-   - Implement predictions for SARAR and Mixed SARAR models from
-     respectively =sac= and =sacmixed= classes.
-   - Compute BLUP and almost BLUP spatial predictors
-   - About the in-sample / out of sample structure (=newdata=)
-   - About the distinction between trend and signal
-   - The simplification of the in-sample predictions
-
-** About the intercept
-
-   We change the scan of the intercept, in particular in presence of
-   $WX$ in the regression. If $W$ is row standardized, we have to drop
-   the intercept to avoid collinearity. The initial function add the
-   constant at the end of the computations, we only drop the intercept
-   in the presence of $WX$.
+#+LaTeX: \clearpage
+#+TOC: headlines 1
+#+LaTeX: \clearpage
 
 * Theoretical Framework
-** Spatial Econometric
+** Spatial Econometric Models
 
-   When considering predicting from spatial econometric models, the
-   first point is to recognize that observations are structurally
-   interdependent and neighboring observation can improve the quality
-   of predictions. Hence, the usual distinction between in-sample (IS)
-   and out-of-sample (OS) predictions has firstly to be refined. It is
-   not simply inside our outside the calibration sample but it has
-   also some relations (or not) with it. The literature about
-   predicting from spatial econometric models is not really unified
-   (see XX for the most significant), and one can consider this note
-   as an attempt, with the associated practical framework implemented
-   in =R=.
+   The particularity of spatial econometric models is the structural
+   interdependence between statistical units. Associated predictions
+   not only depend on the variables of the target units but also on
+   the neighboring units. Hence, the usual distinction between
+   in-sample (IS) and out-of-sample (OS) predictions has firstly to be
+   refined. It is not simply inside our outside the calibration sample
+   but it has also some relations (or not) with it. The literature
+   about predicting from spatial econometric models is not really
+   unified (see XX for the most significant), and one can consider
+   this note as an attempt, with the associated practical framework
+   implemented in =R=.
 
-   From the more general from of the Cliff-Ord (1973, 1981)
-   homoscedastic class of models with exogenous covariates,[fn:1]
+   To present analytically the available predictors, we start with the
+   more general spatial autoregressive mixed conditional (SMC)
+   specification of the Cliff-Ord (1973, 1981) heteroscedasticity
+   class of models with exogenous covariates,[fn:1]
 
 \begin{align}
-y           & = \rho Wy+X\beta+\gamma WX+ \varepsilon\nonumber\\
-\varepsilon & = \lambda W\varepsilon+ u \nonumber
+y & = \rho Wy+X\beta+ WX\theta+ u\nonumber\\
+u & = \lambda W u+ \varepsilon \nonumber
 \end{align}
 
    with $u\sim \mathbf{N}(0, \sigma^2\cdot I_N)$. The $y$ is a
    $N\times 1$ vector continuous outcome, $X$ is a $N\times K$ matrix
    of the $K$ covariates, and $W$ is a $N\times N$ spatial weight
-   matrix. We limit ourselves to a same weight matrix in the outcome
-   and error equations, but nothing precludes this restriction. The
-   unknown parameters $\rho$, $\gamma$, $\lambda$ and $\sigma$ have to
-   be estimated, as the vector $u$ of residuals. Classically, we
-   assume that $\mbox{diag}(W)= 0$, $\mid \rho \mid< 1$, $\mid \lambda
-   \mid< 1$. /standardization of W?/ Not the same notations than
-   KP 2007.
+   matrix (see Anselin 1988). We limit ourselves to a same weight
+   matrix in the outcome and error equations, but formally nothing
+   requires this restriction. The unknown parameters $\rho$, $\beta$,
+   $\theta$, $\lambda$ and $\sigma$ have to be estimated, as the
+   vector $\varepsilon$ of innovations. Classically, we assume that
+   $\mbox{diag}(W)= 0$ and $|\,\rho\,|$, $|\,\lambda\,|< 1$ but the
+   spatial weight matrix $W$ does not need to be symmetric.
 
-   By construction, $W_{ii}$ \gt $0$ to preclude an observation from
-   directly predicting itself
+   This form is sufficiently general that the spatial autoregressive
+   conditional (SAC) model can be recovered with $\theta= 0$, the
+   spatial Durbin model (SDM) model can be recovered when $\lambda=0$,
+   the spatial autoregressive (SAR) model with $\theta=\lambda=0$, the
+   spatial X model (SXM, also called Spatial Durban Error Model by
+   LeSage and Pace, 2009) with $\rho=0$ and the spatial error model
+   (SEM) can be recovered with $\rho=\theta= 0$. All these models can
+   be estimated through the functions =errorsarlm=, =lagsarlm=, and
+   =sacsarlm= of the =R= package =spdep= (Bivand, 2014).
 
-   The geo-statistical models usually involve specifying spatial
-   dependence through the error process as opposed to the spatial lag
-   of the y vector, and these "error models" take a simpler form than
-   autoregressive models
-
-   This model is sufficiently general that the SARAR(1,1) model can be
-   recovered with $\theta= 0$ (Kelejian2007) (also called SAC by
-   Biva02, BPGR13), the spatial error model (SEM) can be recovered
-   with $\rho=\theta= 0$, the spatial X model (SXM) with $\rho=0$, the
-   spatial autoregressive (SAR) model with $\theta=\lambda=0$; and the
-   spatial Durbin model (SDM) model can be recovered when
-   $\lambda=0$. Another useful non exclusive distinction is the error
-   models (SEM, SDM and SARAR) and the lag models (SAR, SDM and SARAR)
+   The geo-statistical models (Cressie 1993) usually involve
+   specifying spatial dependence through the error process (like in
+   SEM or SXM) as opposed to the spatial lag of the outcome vector
+   (like in SAR or SDM). Predicting from these error models take a
+   simpler form than autoregressive models and can be easily recovered
+   from the theoretical framework presented here. The reverse is not
+   true.
 
 ** Making Predictions
 
-   The bias of actual predictors come from the correlation between
-   the spatially lagged dependent variable and the error term.
+   Basically, . in terms of conditional expectation put the focus of
+   the available information used to construct the predictors which is
+   important for the transparency of the code. We consider $\beta$
+   known to focus on prediction formula.
 
-   Since $W_{ii}=0$, $W y$ does not use $y_i$ to predict itself.
+\begin{equation}
+\tag{PRD.X}\mathbf{E}(y\mid X)= X \widehat{\beta}\nonumber
+\end{equation}
+
+\begin{equation}
+\tag{PRD.WX}\mathbf{E}(y\mid X, W)= X\widehat{\beta}+ WX\widehat{\theta}
+\end{equation}
+
+\begin{equation}
+\tag{PRD.KP1}\mathbf{E}(y\mid X, W)= (I_n-\rho W)^{-1} X\widehat{\beta}+ WX\widehat{\theta}
+\end{equation}
+
+   This correspond to KP1 but also the exogenous predictor of LSP. It
+   is the default predictor of the function =sppred=.
+
+\begin{equation}
+\tag{PRD4}\mathbf{E}(y\mid X, W, Wy)= \rho Wy+ X\widehat{\beta}+ WX\widehat{\theta}+ \lambda (Wy- X\beta- WX\theta)
+\end{equation}
+
+   It is a bit strange but $y$ cannot be recovered from $W$ and
+   $Wy$. KP analyses this predictor separately in KP4 and KP5 but such
+   a distinction is not necessary.  Since $\mbox{diag}(W)=0$, $W y$
+   does not use individually the $y_i$ to predict itself but needs
+   them all to predict the entire vector.
+
+   The bias of actual predictors come from the correlation between the
+   spatially lagged dependent variable and the error term. It is why
+   the use of best linear unbiased predictor (Golberger) is of
+   particular importance.
+
+\begin{equation}
+\tag{PRD5}\mathbf{E}(y\mid X, W, y_{IS})= (I_n-\rho W)^{-1} X\widehat{\beta}+ WX\widehat{\theta}
+                                        + \Omega_{21}\Omega_{11}^{-1}(y_{IS}-\mathbf{E}(y_{IS}\mid X, W))
+\end{equation}
+
+   The covariance can be simplified with precision matrix (Harville)
+   which do not necessitate the inversion of matrix:
+   $\Omega_{21}\Omega_{11}^{-1}= \Psi_{21}\Psi_{11}^{-1}$. LSP also
+   present a leave-one-out (loo) specification of this predictor, that
+   is based on the same conditioning set, except that we consider the
+   predictions individually of each OS units indexed $i$.
+
+\begin{equation}
+\tag{prdLSP}\mathbf{E}(y_i\mid X, W, y_{IS})= (I_n-\rho W)^{-1}X\widehat{\beta}+ WX\widehat{\theta}
+                                            + \Omega_{21}\Omega_{11}^{-1}(y_{IS}-\mathbf{E}(y_{IS}\mid X, W))\label{prdLSP}
+\end{equation}
+
+   This simplification comes from...
+
+\begin{equation}
+\tag{prdKP2}\mathbf{E}(y_i\mid X, W, y_{IS})= \rho Wy+ X\widehat{\beta}+ WX\widehat{\theta} 
+                                            +  \Omega_{21}\Omega_{11}^{-1}(y_{IS}-\mathbf{E}(y_{IS}\mid X, W))
+\end{equation}
+
+     yopla
+
+\begin{equation}
+\tag{prdKP2}\mathbf{E}(y_i\mid X, W, y_{IS})= \rho Wy+ X\widehat{\beta}+ WX\widehat{\theta}
+                                        + \Omega_{21}\Omega_{11}^{-1}(y_{IS}-\mathbf{E}(y_{IS}\mid X, W))
+\end{equation}
+
+   If we put aside the differences in the conditional mean of the
+   exogenous part, this predictor =predKP2= is identical to [[ref:prdLSP][prdLSP]].
+
 
    Can we still maintain the signal trend distinction? Does it the
    same as direct and indirect effects of covariates?
@@ -199,11 +248,11 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
                                    "sac"= "sac", "sacmixed"= "smc")
     }
     ## DATA SHAPING
-    Wlg <- substr(names(object$coefficients), 1, 4)== "lag."
-    B <- object$coefficients[ !Wlg]
     if (mod %in% c("sem", "sxm")) {lab= object$lambda ; rho= 0         }
     if (mod %in% c("sar", "sdm")) {lab= 0             ; rho= object$rho}
     if (mod %in% c("sac", "smc")) {lab= object$lambda ; rho= object$rho}
+    Wlg <- substr(names(object$coefficients), 1, 4)== "lag."
+    B <- object$coefficients[ !Wlg] ; Bl <- object$coefficients[ Wlg]
     if (is.null(newdata)){
         X   <- object$X[, !Wlg]
     } else {
@@ -222,18 +271,20 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
         pt <- switch(blup, "LSP"= 5, "KP2"= 6, "KP3"= 7, "KPG"= 8)
     }
     prdX <- as.vector(X %*% B) ; print(pt)
-    if (pt> 1) prdWX   <- prdWX(object, X, prdX, mod, lsw)
-    if (pt> 2) prdKP1  <- prdKP1(prdWX, rho, lsw, power, order, tol)
-    if (pt> 3 && pt!= 4){
-        prdWXy <- prdWX+
-            rho* lag.listw(lsw, yobs)+ lab* lag.listw(lsw, yobs- prdWX)}
+    if (pt> 1) prdWX   <- prdWX(prdX, X, Bl, mod, lsw)
+    if (pt> 2 && pt!= 4) prdKP1  <- prdKP1(prdWX, rho, lsw, power, order, tol)
+    if (pt> 3){
+        prdWXy <- prdWX+ rho* lag.listw(lsw, yobs)
+                       + lab* lag.listw(lsw, yobs- prdWX)}
     if (pt==5) prdLSP <- prdLSP(prdKP1, rho, lab, lsw, yobs, loo)
     if (pt> 5 && !loo) stop("Set loo= TRUE for this blup predictor")
     if (pt==6){
         prdKP2 <- prdKP2(prdKP1, prdWXy,
                          rho, lab, lsw, yobs, power, order, tol)}
-    if (pt==7) prdKP3 <- prdKP3(object, prd, mod, B, X, lsw, yobs)
-    if (pt==8) prdKPG <- prdKPG(mod, lsw, power, legacy, order, tol)
+    if (pt==7){
+        prdKP3 <- prdKP3(prdKP1, prdWXy,
+                         rho, lab, lsw, yobs, power, order, tol)}
+    if (pt==8) stop("not implemented")
     prd <- switch(pt, "1"= prdX, "2"= prdWX, "3"= prdKP1, "4"= prdWXy,
                       "5"= prdLSP, "6"= prdKP2, "7"= prdKP3, "8"= prdKPG)
     class(prd) <- "sppred" ; as.vector(prd)
@@ -250,16 +301,17 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
 *** exogenous predictor
 
 #+begin_src R :results silent :tangle ./sppred.R
-prdWX <- function(object, X= X, prdX= prdX, mod= mod, lsw= lsw){
-    if (mod %in% c("sxm", "sdm", "smc")){
-        K <- ifelse(colnames(X)[ 1] == "(Intercept)", 2, 1)
-        m <- ncol(X) ; WX <- matrix(nrow= length(prdX), ncol= m+ 1- K)
-        for (k in K: m){
-            WX[, k+ 1- K] <- lag.listw(lsw, X[, k])
-        }
-        prdWX <- prdX+ (WX %*% object$coefficients[ m+ 1+ 0: (m- K)])
-    } else prdWX <- prdX
-   prdWX
+prdWX <- function(prdX, X= X, Bl= Bl, mod= mod, lsw= lsw){
+    if (!mod %in% c("sxm", "sdm", "smc")){
+        prdWX <- prdX } else {
+            K <- ifelse(colnames(X)[ 1] == "(Intercept)", 2, 1)
+            m <- ncol(X) ; WX <- matrix(nrow= length(prdX), ncol= m+ 1- K)
+            for (k in K: m){
+                WX[, k+ 1- K] <- lag.listw(lsw, X[, k])
+            }
+            prdWX <- prdX+ (WX %*% Bl)
+        } 
+    prdWX
 }
 #+end_src
 
@@ -270,7 +322,7 @@ prdKP1 <- function(prdWX, rho= rho, lsw= lsw,
                    power= power, order= order, tol= tol){
     if (power){
         W <- as(as_dgRMatrix_listw(lsw), "CsparseMatrix")
-        prdKP1 <- c(as(powerWeights(W, rho= rho, X= prdWX,
+        prdKP1 <- c(as(powerWeights(W, rho= rho, X= as.matrix(prdWX),
                                     order= order, tol= tol), "matrix"))
     } else {
         prdKP1 <- c(invIrW(lsw, rho) %*% prdWX)
@@ -327,11 +379,11 @@ prdKP2 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
         GL <- invIrW(lsw, rho) ; GR <- invIrW(lsw, lab)
     }
     sum.u <- GL %*% t(GL) ; sum.y <- GR %*% sum.u %*% t(GR)
-    WM <- listw2mat(lsw)
+    WM <- listw2mat(lsw)[i, ]
     prdKP2 <- matrix(NA, ncol= 1, nrow= length(prdWXy))
     for (i in 1: length(prdKP2)){
-        rg <- (sum.u[i, ] %*% GR %*% WM[i, ])/ (WM[i, ] %*% sum.y %*% WM[i, ])
-        prdKP2[ i] <- prdWXy[ i]+ (rg %*% WM[i, ] %*% (yobs- prdKP1))
+        rg <- (sum.u[i, ] %*% GR %*% WM)/ (WM %*% sum.y %*% WM)
+        prdKP2[ i] <- prdWXy[ i]+ (rg %*% WM %*% (yobs- prdKP1))
     }
     prdKP2
 }
@@ -342,12 +394,34 @@ prdKP2 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
 #+begin_src R :results silent :tangle ./sppred.R
 prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
                    yobs= yobs, power= power, order= order, tol= tol){
+    if (power){
+        W <- as(as_dgRMatrix_listw(lsw), "CsparseMatrix")
+        GL <- as(powerWeights(W, rho= lab, order= order, tol= tol,
+                              X= diag(length(prdWXy))), "matrix")
+        GR <- as(powerWeights(W, rho= rho, order= order, tol= tol,
+                              X= diag(length(prdWXy))), "matrix")
+    } else {
+        GL <- invIrW(lsw, lab) ; GR <- invIrW(lsw, rho)
+    }
+    sum.u <- GL %*% t(GL) ; sum.y <- GR %*% sum.u %*% t(GR)
+    prdKP3 <- matrix(NA, ncol= 1, nrow= length(prdWXy))    
+    for (i in 1: length(prdKP3)){
+        rg <- sum.u[i, ] %*% GR[, -i] %*% solve(sum.y[-i, -i])
+        prdKP3[ i] <- prdWXy[ i]+ (rg %*% (yobs[-i ]- prdKP1[-i ]))
+    }
     prdKP3
 }
 #+end_src
 
-
 ** Predictors conditioned by hand
+
+   Try with
+
+#+BEGIN_QUOTE
+        rg <- sum.u[i, ] %*% GR %*% solve(sum.y)
+        prdKP3[ i] <- prdWXy[ i]+ (rg %*% (yobs- prdKP1))
+#+END_QUOTE
+
 * How it works
 ** Choosing a type of predictor
 
@@ -380,7 +454,15 @@ prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
    powerWeigths?
 
 ** The predictors 1 for OS predictions   
-* Testing
+* The =boston= example
+** Estimating the models
+
+#+begin_src R :results output exemple
+library(spdep) ; data(boston)
+#+end_src
+
+** Predicting
+* Testing							   :noexport:
 ** Sample
 
 #+Name: Lst:PSS
@@ -468,7 +550,7 @@ sqrt(mean(I(SXMprdWX- SXM$y)^2))
 
 #+begin_src R :results output exemple
 source("sppred.R")
-SEMprdKP1 <- sppred(SEM)
+SEMprdKP1 <- sppred(SDM, power= TRUE)
 sqrt(mean(I(SEMprdKP1- SEM$y)^2))
 SXMprdKP1 <- sppred(SXM)
 sqrt(mean(I(SXMprdKP1- SXM$y)^2))
@@ -480,6 +562,10 @@ SACprdKP1 <- sppred(SAC)
 sqrt(mean(I(SACprdKP1- SAR$y)^2))
 SMCprdKP1 <- sppred(SMC)
 sqrt(mean(I(SMCprdKP1- SAR$y)^2))
+
+yop <- sppred(SXM, condset= "XW")
+WWW <- as(as_dgRMatrix_listw(exsmp$Wgt.cal), "CsparseMatrix")
+pp <- c(as(powerWeights(WWW, rho= 0, X= as.matrix(yop)), "matrix"))
 
 SXMprdKP1 <- sppred(SXM, newdata= exsmp$Dat.cal)
 sqrt(mean(I(SXMprdKP1- SXM$y)^2))
@@ -568,11 +654,79 @@ sqrt(mean(I(SMCprdKP2- SMC$y)^2))
 ## ON PEUT COMMENCER A METTRE DU yobs choisit
 #+end_src
 
+*** KP3 predictor
+
+#+begin_src R :results output exemple
+source("sppred.R")
+SEMprdKP3 <- sppred(SEM, blup= "KP3", loo= TRUE)
+sqrt(mean(I(SEMprdKP3- SEM$y)^2))
+yop <- sppred(SEM, blup= "LSP", loo= TRUE)
+sqrt(mean(I(yop- SEM$y)^2))
+
+system.time(SXMprdKP3 <- sppred(SXM, blup= "KP3", loo= TRUE, power= FALSE))
+sqrt(mean(I(SXMprdKP3- SXM$y)^2))
+system.time(yop <- sppred(SXM, blup= "LSP", loo= TRUE, power= TRUE))
+sqrt(mean(I(yop- SXM$y)^2))
+
+
+system.time(SARprdKP3 <- sppred(SAR, blup= "KP3", loo= TRUE))
+sqrt(mean(I(SARprdKP3- SAR$y)^2))
+system.time(yop <- sppred(SAR, blup= "LSP", loo= TRUE, power= TRUE))
+sqrt(mean(I(yop- SAR$y)^2))
+
+a <- SARprdKP3- sppred(SAR, condset= "XWy")
+b <- yop- sppred(SAR)
+plot(a, b)
+
+
+SDMprdKP3 <- sppred(SDM, blup= "KP3", loo= TRUE)
+sqrt(mean(I(SDMprdKP3- SDM$y)^2))
+SACprdKP3 <- sppred(SAC, blup= "KP3", loo= TRUE)
+sqrt(mean(I(SACprdKP3- SAC$y)^2))
+SMCprdKP3 <- sppred(SMC, blup= "KP3", loo= TRUE, power= TRUE)
+sqrt(mean(I(SMCprdKP3- SMC$y)^2))
+yop <- sppred(SMC, blup= "LSP", loo= TRUE)
+sqrt(mean(I(yop- SMC$y)^2))
+
+
+
+
+SMCprdKP3 <- sppred(SMC, condset= "X",
+                    newdata= exsmp$Dat.cal[ 1: 10,],
+                    blup= "KP3", loo= TRUE)
+sqrt(mean(I(SMCprdKP3- SMC$y)^2))
+
+yop <- sppred(SMC, blup= "LSP", loo= TRUE)
+sqrt(mean(I(SMCprdKP3- SMC$y)^2))
+
+plot(yop, SMCprdKP3)
+
+## ON PEUT COMMENCER A METTRE DU yobs choisit
+#+end_src
+
+* Summary
+** Changes relative to =predict.sarlm=
+
+   - Implement predictions for SARAR and Mixed SARAR models from
+     respectively =sac= and =sacmixed= classes.
+   - Compute BLUP and almost BLUP spatial predictors
+   - About the in-sample / out of sample structure (=newdata=)
+   - About the distinction between trend and signal
+   - The simplification of the in-sample predictions
+
+** About the intercept
+
+   We change the scan of the intercept, in particular in presence of
+   $WX$ in the regression. If $W$ is row standardized, we have to drop
+   the intercept to avoid collinearity. The initial function add the
+   constant at the end of the computations, we only drop the intercept
+   in the presence of $WX$.
 
 * Footnotes
 
-[fn:1] This model has different names in the literature: spatial
-autoregressive model with autoregressive disturbances (SARAR(1,1),
-Kelejian and Prucha, 1998) or Spatial Autoregressive Conditional (SAC,
-XX). We retain XX here.
+[fn:1] This terminology comes from LeSage and Pace (2009) and Bivand
+(2014). This model is called spatial autoregressive model with
+autoregressive disturbances, SARAR(1,1), by Kelejian and Prucha
+(1998). The notations are also matter of discussion, we adopt those of
+the =R= package =spdep= (Bivand, 2014).
 
