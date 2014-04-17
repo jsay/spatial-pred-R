@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Extending Predictions from Spatial Econometric Models on R</title>
-<!-- 2014-04-12 sam. 16:32 -->
-<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
-<meta name="generator" content="Org-mode"/>
-<meta name="author" content="Jean-Sauveur AY \\ \lt[[mailto:jsay.site@gmail.com][jsay.site@gmail.com]]jsay.site@gmail.com\gt \and Julie LE GALLO\\ \lt[[mailto:jlegallo@univ-fcomte.fr][jlegallo@univ-fcomte.fr]]jlegallo@univ-fcomte.fr\gt"/>
+<!-- 2014-04-17 jeu. 11:55 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Jean-Sauveur AY \\ \lt[[mailto:jsay.site@gmail.com][jsay.site@gmail.com]]jsay.site@gmail.com\gt \and Raja CHAKIR\\ \lt[[mailto:chakir@grignon.inra.fr][chakir@grignon.inra.fr]]chakir@grignon.inra.fr\gt\\ \and Julie LE GALLO\\ \lt[[mailto:jlegallo@univ-fcomte.fr][jlegallo@univ-fcomte.fr]]jlegallo@univ-fcomte.fr\gt" />
 <style type="text/css">
  <!--/*--><![CDATA[/*><!--*/
   .title  { text-align: center; }
@@ -54,6 +55,8 @@
   pre.src-sql:before   { content: 'SQL'; }
 
   table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
   td, th { vertical-align:top;  }
   th.right  { text-align: center;  }
   th.left   { text-align: center;   }
@@ -86,7 +89,6 @@
   /*]]>*/-->
 </style>
 <link rel="stylesheet" type="text/css" href="http://thomasf.github.io/solarized-css/solarized-light.min.css" />
-<base target="_blank">
 
 <script type="text/javascript" src="http://thomasf.github.io/solarized-css/org-info.min.js">
 /**
@@ -96,7 +98,7 @@
  * @licstart  The following is the entire license notice for the
  *  JavaScript code in http://thomasf.github.io/solarized-css/org-info.min.js.
  *
- * Copyright (C) 2012-2013  Sebastian Rose
+ * Copyright (C) 2012-2013 Free Software Foundation, Inc.
  *
  *
  * The JavaScript code in this tag is free software: you can
@@ -164,7 +166,7 @@ org_html_manager.setup();  // activate after the parameters are set
 @licstart  The following is the entire license notice for the
 JavaScript code in this tag.
 
-Copyright (C) 2012  Free Software Foundation, Inc.
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
 
 The JavaScript code in this tag is free software: you can
 redistribute it and/or modify it under the terms of the GNU
@@ -205,7 +207,8 @@ for the JavaScript code in this tag.
  }
 /*]]>*///-->
 </script>
-<script type="text/javascript" src="http://orgmode.org/mathjax/MathJax.js">
+<script type="text/javascript" src="http://orgmode.org/mathjax/MathJax.js"></script>
+<script type="text/javascript">
 <!--/*--><![CDATA[/*><!--*/
     MathJax.Hub.Config({
         // Only one of the two following lines, depending on user settings
@@ -256,8 +259,9 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-1">1. Theoretical Framework</a>
 <ul>
-<li><a href="#sec-1-1">1.1. Spatial Econometric Models</a></li>
-<li><a href="#sec-1-2">1.2. Making Predictions</a></li>
+<li><a href="#sec-1-1">1.1. Spatial econometric models</a></li>
+<li><a href="#sec-1-2">1.2. Implementing predictions</a></li>
+<li><a href="#sec-1-3">1.3. A taxonomy of spatial predictions</a></li>
 </ul>
 </li>
 <li><a href="#sec-2">2. Current function from <code>spdep</code></a></li>
@@ -289,10 +293,11 @@ for the JavaScript code in this tag.
 <li><a href="#sec-4-4">4.4. The predictors 1 for OS predictions</a></li>
 </ul>
 </li>
-<li><a href="#sec-5">5. The <code>Boston</code> example</a>
+<li><a href="#sec-5">5. The <code>boston</code> example</a>
 <ul>
-<li><a href="#sec-5-1">5.1. Estimating the models</a></li>
-<li><a href="#sec-5-2">5.2. Predicting</a></li>
+<li><a href="#sec-5-1">5.1. Extracting the estimation set</a></li>
+<li><a href="#sec-5-2">5.2. Estimating the models</a></li>
+<li><a href="#sec-5-3">5.3. Predicting</a></li>
 </ul>
 </li>
 <li><a href="#sec-6">6. Summary</a>
@@ -307,17 +312,17 @@ for the JavaScript code in this tag.
 <div class="abstract">
 <p>
 This document presents an integrative framework to make predictions
-from spatial autoregressive models (Cliff and Ord 1973, 1981; Anselin
-1988). It also contains the corresponding <a href="http://www.r-project.org"><code>R</code> code</a> to implement the
-predictors presented. The code is gathered into the <a href="./sppred.R"><code>sppred</code></a> function
-that implements in particular the predictors from LeSage and Pace
+from spatial autoregressive models [<a href="#COrd73">COrd73</a>,<a href="# COrd81"> COrd81</a>,<a href="# Anse88"> Anse88</a>]. It
+also contains the corresponding <a href="http:www.r-project.org"><b>R</b> code</a> to implement the predictors
+presented. The code is tangled into the <a href="./sppred.R"><code>sppred</code></a> function that
+implements in particular the predictors from LeSage and Pace
 (2004, 2008) and Kelejian and Prucha (2004) for a large number of
-specifications of spatial autocorrelation from the <a href="http://cran.r-project.org/web/packages/spdep/index.html"><code>spdep</code> package</a>
+specifications of spatial autocorrelation from the <a href="http:cran.r-project.org/web/packages/spdep/index.html"><code>spdep</code> package</a>
 (Bivand 2014). To use this code, save the file <a href="./sppred.R"><code>sppred</code></a> in your
-working directory then submit <code>source("sppred.R")</code> to <code>R</code>. Some
+working directory then submit <code>source("sppred.R")</code> to <b>R</b>. Some
 examples on the <code>boston</code> data are also available at section XX. The
 status of this work is actually under construction, comments are
-welcome.<br/>
+welcome.<br  />
 </p>
 
 <p>
@@ -326,7 +331,7 @@ welcome.<br/>
 <ul class="org-ul">
 <li>Code the variances and confidence intervals of predictors
 </li>
-<li>Code the predictors for ex-sample predictions
+<li>Code the weight matrix for ex-sample predictions
 </li>
 <li>Code the predictors for <code>sphet</code> and <code>splm</code> objects
 </li>
@@ -341,7 +346,7 @@ welcome.<br/>
 <li><a href="#sec-2">2. Current function from <code>spdep</code></a></li>
 <li><a href="#sec-3">3. The <code>sppred</code> extension</a></li>
 <li><a href="#sec-4">4. How it works</a></li>
-<li><a href="#sec-5">5. The <code>Boston</code> example</a></li>
+<li><a href="#sec-5">5. The <code>boston</code> example</a></li>
 <li><a href="#sec-6">6. Summary</a></li>
 </ul>
 </div>
@@ -351,78 +356,128 @@ welcome.<br/>
 <h2 id="sec-1"><span class="section-number-2">1</span> Theoretical Framework</h2>
 <div class="outline-text-2" id="text-1">
 </div><div id="outline-container-sec-1-1" class="outline-3">
-<h3 id="sec-1-1"><span class="section-number-3">1.1</span> Spatial Econometric Models</h3>
+<h3 id="sec-1-1"><span class="section-number-3">1.1</span> Spatial econometric models</h3>
 <div class="outline-text-3" id="text-1-1">
 <p>
-The particularity of spatial econometric models is the structural
-interdependence between statistical units. Associated predictions
-not only depend on the variables of the target units but also on
-the neighboring units. Hence, the usual distinction between
-in-sample (IS) and out-of-sample (OS) predictions has firstly to be
-refined. It is not simply inside our outside the calibration sample
-but it has also some relations (or not) with it. The literature
-about predicting from spatial econometric models is not really
-unified (see XX for the most significant), and one can consider
-this note as an attempt, with the associated practical framework
-implemented in <code>R</code>.
+The particularity of spatial econometric models is the <i>ex ante</i>
+specification of interdependence between statistical units,
+typically from their spatial proximity.  Consequently, resulting
+predictions not only depend on the variables of the target units
+(i.e., the units for which we want to predict the outcome) but also
+depend on the variables of their neighbors.  This implies that the
+sample pattern of the outcomes or the residuals contains additional
+information which may be used to modify the regression function so
+as to reduce the prediction variance (Goldberger 1962). [<a href="#COrd73">COrd73</a>]</p>
+
+<p>
+The literature about predicting from spatial econometric models is
+not actually unified, due to different modeling frameworks and
+notations: see LeSage and Pace (2004, 2008) and Kelejian and Prucha
+(2004).  A first contribution of this document is to unify the
+different predictors proposed in the literature into an integrative
+spatial econometric framework.  A second contribution is to present
+the <b>R</b> function <code>sppred</code> that implements all the spatial
+predictors and presents some empirical evidence on their relative
+performance on a well-known dataset (<code>boston</code>, Bivand 2014).
 </p>
 
 <p>
-To present analytically the available predictors, we start with the
-more general spatial autoregressive mixed conditional (SMC)
-specification of the Cliff-Ord (1973, 1981) heteroscedasticity
-class of models with exogenous covariates,<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
+We present analytically the available predictors from spatial
+econometric models estimated on a sample of \(N\) spatial units. We
+begin with the more general spatial autoregressive mixed
+conditional (SMC) specification of the Cliff-Ord (1973, 1981) class
+of homoscedastic models with exogenous covariates,<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
 </p>
 
 \begin{align}
-y & = \rho Wy+X\beta+ WX\theta+ u\nonumber\\
-u & = \lambda W u+ \varepsilon \nonumber
+y & = \alpha+ \rho Wy+X\beta+ WX\theta+ u\nonumber\\
+u & = \lambda W u+ \varepsilon \;\;\mbox{ with }\;\; \varepsilon\sim \mathbf{N}(0, \sigma^2I_N)\nonumber
 \end{align}
 
 <p>
-with \(u\sim \mathbf{N}(0, \sigma^2\cdot I_N)\). The \(y\) is a
-\(N\times 1\) vector continuous outcome, \(X\) is a \(N\times K\) matrix
-of the \(K\) covariates, and \(W\) is a \(N\times N\) spatial weight
+The term \(y\) is a \(N\times 1\) vector of the continuous outcome of
+interest, \(X\) is a \(N\times K\) matrix of the \(K\) non-constant
+covariates, and \(W\) is a \(N\times N\) full-rank spatial weight
 matrix (see Anselin 1988). We limit ourselves to a same weight
 matrix in the outcome and error equations, but formally nothing
-requires this restriction. The unknown parameters \(\rho\), \(\beta\),
-\(\theta\), \(\lambda\) and \(\sigma\) have to be estimated, as the
-vector \(\varepsilon\) of innovations. Classically, we assume that
-\(\mbox{diag}(W)= 0\) and \(|\,\rho\,|\), \(|\,\lambda\,|< 1\) but the
+requires this restriction. The unknown parameters (or vectors of
+parameters) \(\alpha\), \(\rho\), \(\beta\), \(\theta\), \(\lambda\) and
+\(\sigma\) grouped in \(\Theta\) have to be estimated, as the vector
+\(\varepsilon\) of innovations. Classically, we assume that
+\(\mbox{diag}(W)= 0\) and \(|\,\rho\,|\), \(|\,\lambda\,|< 1\). The
 spatial weight matrix \(W\) does not need to be symmetric.
 </p>
 
 <p>
 This form is sufficiently general that the spatial autoregressive
 conditional (SAC) model can be recovered with \(\theta= 0\), the
-spatial Durbin model (SDM) model can be recovered when \(\lambda=0\),
-the spatial autoregressive (SAR) model with \(\theta=\lambda=0\), the
-spatial X model (SXM, also called Spatial Durban Error Model by
-LeSage and Pace, 2009) with \(\rho=0\) and the spatial error model
-(SEM) can be recovered with \(\rho=\theta= 0\). All these models can
-be estimated through the functions <code>errorsarlm</code>, <code>lagsarlm</code>, and
-<code>sacsarlm</code> of the <code>R</code> package <code>spdep</code> (Bivand, 2014).
+spatial Durbin model (SDM) model with \(\lambda=0\), the spatial
+autoregressive (SAR) model with \(\theta=\lambda=0\), the spatial X
+model (SXM, also called Spatial Durban Error Model by LeSage and
+Pace, 2009) with \(\rho=0\) and the spatial error model (SEM) can be
+recovered with \(\rho=\theta= 0\). All these models can be estimated
+by maximum likelihood through the functions <code>errorsarlm</code>,
+<code>lagsarlm</code>, and <code>sacsarlm</code> of the <b>R</b> package <code>spdep</code> (Bivand,
+2014).
 </p>
 
 <p>
-The geo-statistical models (Cressie 1993) usually involve
-specifying spatial dependence through the error process (like in
-SEM or SXM) as opposed to the spatial lag of the outcome vector
-(like in SAR or SDM). Predicting from these error models take a
-simpler form than autoregressive models and can be easily recovered
-from the theoretical framework presented here. The reverse is not
-true.
+For future reference, note that the general SMC model can be
+reduced in \(y= (I-\rho W)^{-1}X\beta +(I-\rho W)^{-1}(I-\lambda
+   W)^{-1}\varepsilon\), with a distribution that involves all of the
+model parameters:
+</p>
+
+\begin{equation}
+y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
+\end{equation}
+
+<p>
+with \(\mu=(I-\rho W)^{-1}X\beta\), and \(\Sigma= \big[(I-\rho
+   W)(I-\lambda W)(I-\lambda W^\top)(I-\rho W^\top)\big]^{-1}\).
+According to the literature, we consider hereafter that the set of
+parameters \(\Theta\) is known with certainty.  This has the
+advantage of simplifying notations by neglecting a source of
+uncertainty that depends on the sample size.  Moreover, all the
+parameters are estimated simultaneously and it makes no sens to
+consider \(\Theta\) as partially known.  Hence, the predictors
+presented are all conditioned by \(\Theta\), which is dropped from
+conditioning sets for the sake of clarity.
+</p>
+
+<p>
+Finally, note that geo-statistical models (Cressie 1990) usually
+involve specifying spatial dependence through the error process
+(like in SEM or SXM) as opposed to the spatial lag of the outcome
+vector (like in SAR or SDM). Predicting from these error models
+take a simpler form than autoregressive models and can be easily
+recovered from the theoretical framework presented here. The
+reverse is not true.
 </p>
 </div>
 </div>
 <div id="outline-container-sec-1-2" class="outline-3">
-<h3 id="sec-1-2"><span class="section-number-3">1.2</span> Making Predictions</h3>
+<h3 id="sec-1-2"><span class="section-number-3">1.2</span> Implementing predictions</h3>
 <div class="outline-text-3" id="text-1-2">
 <p>
-Basically, . in terms of conditional expectation put the focus of
-the available information used to construct the predictors which is
-important for the transparency of the code. We consider \(\beta\)
-known to focus on prediction formula.
+Basically, we consider \(M\) target spatial units for which we want
+to predict the values of the outcome \(y\).  These units may or may
+not be included in the dataset used for the estimation of the
+parameters. At this moment, it makes no differences and we
+distinguish them only in the research interest of obtaining
+predictions of \(y\).<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup>  We discuss this point in more details at the
+next subsection XX.
+</p>
+
+<p>
+The available information set is crucial here, as each predictor is
+formulated as a conditional expectation relative to it. 
+</p>
+
+<p>
+. in terms of conditional expectation put the focus of
+   the available information used to construct the predictors which is
+   important for the transparency of the code. 
 </p>
 
 \begin{equation}
@@ -434,7 +489,7 @@ known to focus on prediction formula.
 \end{equation}
 
 \begin{equation}
-\tag{PRD.KP1}\mathbf{E}(y\mid X, W)= (I_n-\rho W)^{-1} X\widehat{\beta}+ WX\widehat{\theta}
+\tag{PRD.KP1}\mathbf{E}(y\mid X, W)= (I_n-\rho W)^{-1} (X\widehat{\beta}+ WX\widehat{\theta})
 \end{equation}
 
 <p>
@@ -527,6 +582,17 @@ simulations. The prediction in out-of-sample needs a certain
 spatial embedding between the two spatial samples, not having
 sampled neighbors does not mean no neighbors. But in a spatial
 segregative case, this corresponds to a ex-sample case.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-1-3" class="outline-3">
+<h3 id="sec-1-3"><span class="section-number-3">1.3</span> A taxonomy of spatial predictions</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+In spatial econometrics, the usual distinction between in-sample
+(IS) and out-of-sample (OS) predictions has firstly to be
+refined. It is not simply inside our outside the calibration sample
+but it has also some relations (or not) with it.
 </p>
 </div>
 </div>
@@ -648,12 +714,12 @@ name, it has to be changed.
     } <span style="color: #FBDE2D;">else</span> {
         pt <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">switch</span>(blup, <span style="color: #61CE3C;">"LSP"</span>= 5, <span style="color: #61CE3C;">"KP2"</span>= 6, <span style="color: #61CE3C;">"KP3"</span>= 7, <span style="color: #61CE3C;">"KPG"</span>= 8)
     }
-    prdX <span style="color: #4c83ff;">&lt;-</span> as.vector(X %*% B) ; print(pt)
+    prdX <span style="color: #4c83ff;">&lt;-</span> as.vector(X %*% B)
     <span style="color: #FBDE2D;">if</span> (pt&gt; 1) prdWX   <span style="color: #4c83ff;">&lt;-</span> prdWX(prdX, X, Bl, mod, lsw)
     <span style="color: #FBDE2D;">if</span> (pt&gt; 2 &amp;&amp; pt!= 4) prdKP1  <span style="color: #4c83ff;">&lt;-</span> prdKP1(prdWX, rho, lsw, power, order, tol)
     <span style="color: #FBDE2D;">if</span> (pt&gt; 3){
-        prdWXy <span style="color: #4c83ff;">&lt;-</span> prdWX+ rho* lag.listw(lsw, yobs)
-                       + lab* lag.listw(lsw, yobs- prdWX)}
+        prdWXy <span style="color: #4c83ff;">&lt;-</span> prdWX+
+            rho* lag.listw(lsw, yobs)+ lab* lag.listw(lsw, yobs- prdWX)}
     <span style="color: #FBDE2D;">if</span> (pt==5) prdLSP <span style="color: #4c83ff;">&lt;-</span> prdLSP(prdKP1, rho, lab, lsw, yobs, loo)
     <span style="color: #FBDE2D;">if</span> (pt&gt; 5 &amp;&amp; !loo) <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"Set loo= TRUE for this blup predictor"</span>)
     <span style="color: #FBDE2D;">if</span> (pt==6){
@@ -860,14 +926,14 @@ define the available predictors.
 </p>
 
 <table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
-<caption>The available values for the new <code>predictor</code> argument</caption>
+<caption class="t-above"><span class="table-number">Table 1:</span> The available values for the new <code>predictor</code> argument</caption>
 
 <colgroup>
-<col class="left"/>
+<col  class="left" />
 
-<col class="left"/>
+<col  class="left" />
 
-<col class="left"/>
+<col  class="left" />
 </colgroup>
 <thead>
 <tr>
@@ -928,20 +994,71 @@ powerWeigths?
 </div>
 
 <div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5"><span class="section-number-2">5</span> The <code>Boston</code> example</h2>
+<h2 id="sec-5"><span class="section-number-2">5</span> The <code>boston</code> example</h2>
 <div class="outline-text-2" id="text-5">
 </div><div id="outline-container-sec-5-1" class="outline-3">
-<h3 id="sec-5-1"><span class="section-number-3">5.1</span> Estimating the models</h3>
+<h3 id="sec-5-1"><span class="section-number-3">5.1</span> Extracting the estimation set</h3>
 <div class="outline-text-3" id="text-5-1">
 <div class="org-src-container">
 
-<pre class="src src-R"><span style="color: #4c83ff;">library</span>(spdep) ; data(boston)
+<pre class="src src-R"><span style="color: #4c83ff;">library</span>(spdep) ; data(boston) ; <span style="color: #4c83ff;">library</span>(rgdal)
+bst.sp <span style="color: #4c83ff;">&lt;-</span> readOGR(system.file(<span style="color: #61CE3C;">"etc/shapes"</span>, package= <span style="color: #61CE3C;">"spdep"</span>),
+                  <span style="color: #61CE3C;">"boston_tracts"</span>, verbose= <span style="color: #D8FA3C;">FALSE</span>)
+bst.nb <span style="color: #4c83ff;">&lt;-</span> poly2nb(bst.sp) ; bst.lw <span style="color: #4c83ff;">&lt;-</span> nb2listw(bst.nb)
+set.seed(85) 
+tst.sp <span style="color: #4c83ff;">&lt;-</span> bst.sp[cal <span style="color: #4c83ff;">&lt;-</span> unique(round(runif(250)* 500)), ]
+tst.nb <span style="color: #4c83ff;">&lt;-</span> poly2nb(tst.sp) ; ins.sp <span style="color: #4c83ff;">&lt;-</span> subset(tst.sp, card(tst.nb)!= 0)
+ins.nb <span style="color: #4c83ff;">&lt;-</span> poly2nb(ins.sp) ; ins.lw <span style="color: #4c83ff;">&lt;-</span> nb2listw(ins.nb)
+tst.sp <span style="color: #4c83ff;">&lt;-</span> subset(bst.sp,
+                 !bst.sp$poltract %<span style="color: #FBDE2D;">in</span>% levels(factor(ins.sp$poltract)))
+tst.nb <span style="color: #4c83ff;">&lt;-</span> poly2nb(tst.sp) ; ots.sp <span style="color: #4c83ff;">&lt;-</span> subset(tst.sp, card(tst.nb)!= 0)
+ots.nb <span style="color: #4c83ff;">&lt;-</span> poly2nb(ots.sp) ; ots.lw <span style="color: #4c83ff;">&lt;-</span> nb2listw(ots.nb)
+bst <span style="color: #4c83ff;">&lt;-</span> data.frame(A= rep(row.names(bst.sp), card(bst.nb)), B= unlist(bst.nb))
+ins <span style="color: #4c83ff;">&lt;-</span> data.frame(A= rep(row.names(ins.sp), card(ins.nb)), B= unlist(ins.nb))
+ots <span style="color: #4c83ff;">&lt;-</span> data.frame(A= rep(row.names(ots.sp), card(ots.nb)), B= unlist(ots.nb))
+ins$ins <span style="color: #4c83ff;">&lt;-</span> 1 ; ots$ots <span style="color: #4c83ff;">&lt;-</span> 1
+yop <span style="color: #4c83ff;">&lt;-</span> data.frame(merge(bst, ins, by= c(<span style="color: #61CE3C;">"A"</span>, <span style="color: #61CE3C;">"B"</span>), all.x= <span style="color: #D8FA3C;">TRUE</span>),
+                  <span style="color: #61CE3C;">"ots"</span>= merge(bst, ots, by= c(<span style="color: #61CE3C;">"A"</span>, <span style="color: #61CE3C;">"B"</span>), all.x= <span style="color: #D8FA3C;">TRUE</span>)[, 3])
+par(mar= c(0, 0, 0, 0)) ; plot(bst.sp)
+plot(ins.sp, col= <span style="color: #61CE3C;">"grey30"</span>, add= <span style="color: #D8FA3C;">TRUE</span>)
+plot(ots.sp, col= <span style="color: #61CE3C;">"grey70"</span>, add= <span style="color: #D8FA3C;">TRUE</span>)
+plot(bst.nb, coordinates(bst.sp), add= <span style="color: #D8FA3C;">TRUE</span>, col= <span style="color: #61CE3C;">"red"</span>)
+plot(ins.nb, coordinates(ins.sp), add= <span style="color: #D8FA3C;">TRUE</span>, col= <span style="color: #61CE3C;">"blue"</span>)
+plot(ots.nb, coordinates(ots.sp), add= <span style="color: #D8FA3C;">TRUE</span>, col= <span style="color: #61CE3C;">"green"</span>)
 </pre>
 </div>
 </div>
 </div>
 <div id="outline-container-sec-5-2" class="outline-3">
-<h3 id="sec-5-2"><span class="section-number-3">5.2</span> Predicting</h3>
+<h3 id="sec-5-2"><span class="section-number-3">5.2</span> Estimating the models</h3>
+<div class="outline-text-3" id="text-5-2">
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #4c83ff;">library</span>(spdep) ; data(boston)
+
+example(boston)
+<span style="color: #4c83ff;">require</span>(maptools)
+
+eqn.bst <span style="color: #4c83ff;">&lt;-</span> log(CMEDV)~ CRIM    + ZN + INDUS   + CHAS    + I(NOX^2)+
+                       I(RM^2) + AGE+ log(DIS)+ log(RAD)+ TAX     +
+                       PTRATIO + B  + log(LSTAT)
+gp1 <span style="color: #4c83ff;">&lt;-</span> errorsarlm(eqn.bst, data= bst.tr, nb2listw(bst.nb), method=<span style="color: #61CE3C;">"Matrix"</span>)
+gp2 <span style="color: #4c83ff;">&lt;-</span> lagsarlm(eqn.bst, data= bst.tr, nb2listw(bst.nb), method=<span style="color: #61CE3C;">"Matrix"</span>)
+widths <span style="color: #4c83ff;">&lt;-</span> c(ID= 5L, FIPS70State= 2L, FIPS70cty= 3L, Tract70= 6L,
+            FIPS80State= 2L, FIPS80cty= 3L, f1= 7L, CTC= 6L, f2= 2L,
+            intersect1= 3L, intersect2= 3L, name= 30L)
+dta0 <span style="color: #4c83ff;">&lt;-</span> read.fwf(<span style="color: #61CE3C;">"07913-0001-Data.txt"</span>, unname(widths),
+                 col.names=names(widths), colClasses=rep(<span style="color: #61CE3C;">"character"</span>, 12), as.is=<span style="color: #D8FA3C;">TRUE</span>)
+
+
+
+plot(bst.tr)
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3"><span class="section-number-3">5.3</span> Predicting</h3>
 </div>
 </div>
 
@@ -976,6 +1093,37 @@ the intercept to avoid collinearity. The initial function add the
 constant at the end of the computations, we only drop the intercept
 in the presence of \(WX\).
 </p>
+
+
+<div id="bibliography">
+<h2>References</h2>
+
+</div>
+
+
+<p><a name="Anse88"></a>
+
+<b>Anselin, L.</b> (1988). <em>Spatial Econometrics: Methods and Models</em>,
+   <em>4</em>. Springer, Boston.
+[&nbsp;<a href="BibPrd_bib.html#Anse88">bib</a>&nbsp;]
+
+</p>
+
+<p><a name="COrd73"></a>
+
+<b>Cliff, A.&nbsp;D. and J.&nbsp;K. Ord</b> (1973). <em>Spatial Autocorrelation</em>,
+  <em>5</em>. Pion, London.
+[&nbsp;<a href="BibPrd_bib.html#COrd73">bib</a>&nbsp;]
+
+</p>
+
+<p><a name="COrd81"></a>
+
+<b>Cliff, A.&nbsp;D. and J.&nbsp;K. Ord</b> (1981). <em>Spatial Processes, Models &amp;
+  Applications</em>. Pion, London.
+[&nbsp;<a href="BibPrd_bib.html#COrd81">bib</a>&nbsp;]
+
+</p>
 </div>
 </div>
 </div>
@@ -985,10 +1133,17 @@ in the presence of \(WX\).
 
 <div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
 This terminology comes from LeSage and Pace (2009) and Bivand
-(2014). This model is called spatial autoregressive model with
+(2014). This model is also called spatial autoregressive model with
 autoregressive disturbances, SARAR(1,1), by Kelejian and Prucha
-(1998). The notations are also matter of discussion, we adopt those of
-the <code>R</code> package <code>spdep</code> (Bivand, 2014).
+(1998). The notations of spatial lag coefficients also depends on
+authors, we adopt here those of the <b>R</b> package <code>spdep</code> (Bivand,
+2014).
+</p></div>
+
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+In particular, it could be of interest to predict outcome
+values for units with known \(y\) for diagnostic, goodness-of-fit
+purposes or computations of marginal effects of covariates.
 </p></div>
 
 

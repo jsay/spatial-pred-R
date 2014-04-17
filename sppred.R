@@ -40,12 +40,12 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
     } else {
         pt <- switch(blup, "LSP"= 5, "KP2"= 6, "KP3"= 7, "KPG"= 8)
     }
-    prdX <- as.vector(X %*% B) ; print(pt)
+    prdX <- as.vector(X %*% B)
     if (pt> 1) prdWX   <- prdWX(prdX, X, Bl, mod, lsw)
     if (pt> 2 && pt!= 4) prdKP1  <- prdKP1(prdWX, rho, lsw, power, order, tol)
     if (pt> 3){
-        prdWXy <- prdWX+ rho* lag.listw(lsw, yobs)
-                       + lab* lag.listw(lsw, yobs- prdWX)}
+        prdWXy <- prdWX+
+            rho* lag.listw(lsw, yobs)+ lab* lag.listw(lsw, yobs- prdWX)}
     if (pt==5) prdLSP <- prdLSP(prdKP1, rho, lab, lsw, yobs, loo)
     if (pt> 5 && !loo) stop("Set loo= TRUE for this blup predictor")
     if (pt==6){
@@ -55,7 +55,7 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
         prdKP3 <- prdKP3(prdKP1, prdWXy,
                          rho, lab, lsw, yobs, power, order, tol)}
     if (pt==8) stop("not implemented")
-    prd <- switch(pt, "1"= prdX, "2"= prdWX, "3"= prdKP1, "4"= prdWXy,
+    prd <- switch(pt, "1"= prdX  , "2"= prdWX , "3"= prdKP1, "4"= prdWXy,
                       "5"= prdLSP, "6"= prdKP2, "7"= prdKP3, "8"= prdKPG)
     class(prd) <- "sppred" ; as.vector(prd)
 }
@@ -115,9 +115,9 @@ prdKP2 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
         GL <- invIrW(lsw, rho) ; GR <- invIrW(lsw, lab)
     }
     sum.u <- GL %*% t(GL) ; sum.y <- GR %*% sum.u %*% t(GR)
-    WM <- listw2mat(lsw)[i, ]
     prdKP2 <- matrix(NA, ncol= 1, nrow= length(prdWXy))
     for (i in 1: length(prdKP2)){
+        WM <- listw2mat(lsw)[i, ]
         rg <- (sum.u[i, ] %*% GR %*% WM)/ (WM %*% sum.y %*% WM)
         prdKP2[ i] <- prdWXy[ i]+ (rg %*% WM %*% (yobs- prdKP1))
     }
