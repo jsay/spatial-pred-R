@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Extending Predictions from Spatial Econometric Models on R</title>
-<!-- 2014-04-17 jeu. 11:55 -->
+<!-- 2014-04-17 jeu. 19:14 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Jean-Sauveur AY \\ \lt[[mailto:jsay.site@gmail.com][jsay.site@gmail.com]]jsay.site@gmail.com\gt \and Raja CHAKIR\\ \lt[[mailto:chakir@grignon.inra.fr][chakir@grignon.inra.fr]]chakir@grignon.inra.fr\gt\\ \and Julie LE GALLO\\ \lt[[mailto:jlegallo@univ-fcomte.fr][jlegallo@univ-fcomte.fr]]jlegallo@univ-fcomte.fr\gt" />
@@ -295,9 +295,14 @@ for the JavaScript code in this tag.
 </li>
 <li><a href="#sec-5">5. The <code>boston</code> example</a>
 <ul>
-<li><a href="#sec-5-1">5.1. Extracting the estimation set</a></li>
+<li><a href="#sec-5-1">5.1. Subset the dataset</a></li>
 <li><a href="#sec-5-2">5.2. Estimating the models</a></li>
-<li><a href="#sec-5-3">5.3. Predicting</a></li>
+<li><a href="#sec-5-3">5.3. Predicting</a>
+<ul>
+<li><a href="#sec-5-3-1">5.3.1. Inefficient predictors</a></li>
+<li><a href="#sec-5-3-2">5.3.2. BLUP predictors</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#sec-6">6. Summary</a>
@@ -442,7 +447,8 @@ uncertainty that depends on the sample size.  Moreover, all the
 parameters are estimated simultaneously and it makes no sens to
 consider \(\Theta\) as partially known.  Hence, the predictors
 presented are all conditioned by \(\Theta\), which is dropped from
-conditioning sets for the sake of clarity.
+conditioning sets for the sake of clarity. So its not the true BLUP
+but an approximation.
 </p>
 
 <p>
@@ -729,7 +735,7 @@ name, it has to be changed.
         prdKP3 <span style="color: #4c83ff;">&lt;-</span> prdKP3(prdKP1, prdWXy,
                          rho, lab, lsw, yobs, power, order, tol)}
     <span style="color: #FBDE2D;">if</span> (pt==8) <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"not implemented"</span>)
-    prd <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">switch</span>(pt, <span style="color: #61CE3C;">"1"</span>= prdX, <span style="color: #61CE3C;">"2"</span>= prdWX, <span style="color: #61CE3C;">"3"</span>= prdKP1, <span style="color: #61CE3C;">"4"</span>= prdWXy,
+    prd <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">switch</span>(pt, <span style="color: #61CE3C;">"1"</span>= prdX  , <span style="color: #61CE3C;">"2"</span>= prdWX , <span style="color: #61CE3C;">"3"</span>= prdKP1, <span style="color: #61CE3C;">"4"</span>= prdWXy,
                       <span style="color: #61CE3C;">"5"</span>= prdLSP, <span style="color: #61CE3C;">"6"</span>= prdKP2, <span style="color: #61CE3C;">"7"</span>= prdKP3, <span style="color: #61CE3C;">"8"</span>= prdKPG)
     class(prd) <span style="color: #4c83ff;">&lt;-</span> <span style="color: #61CE3C;">"sppred"</span> ; as.vector(prd)
 }
@@ -852,9 +858,9 @@ It can make sens to distinguish one shot to one leave one.
         GL <span style="color: #4c83ff;">&lt;-</span> invIrW(lsw, rho) ; GR <span style="color: #4c83ff;">&lt;-</span> invIrW(lsw, lab)
     }
     sum.u <span style="color: #4c83ff;">&lt;-</span> GL %*% t(GL) ; sum.y <span style="color: #4c83ff;">&lt;-</span> GR %*% sum.u %*% t(GR)
-    WM <span style="color: #4c83ff;">&lt;-</span> listw2mat(lsw)[i, ]
     prdKP2 <span style="color: #4c83ff;">&lt;-</span> matrix(<span style="color: #D8FA3C;">NA</span>, ncol= 1, nrow= length(prdWXy))
     <span style="color: #FBDE2D;">for</span> (i <span style="color: #FBDE2D;">in</span> 1: length(prdKP2)){
+        WM <span style="color: #4c83ff;">&lt;-</span> listw2mat(lsw)[i, ]
         rg <span style="color: #4c83ff;">&lt;-</span> (sum.u[i, ] %*% GR %*% WM)/ (WM %*% sum.y %*% WM)
         prdKP2[ i] <span style="color: #4c83ff;">&lt;-</span> prdWXy[ i]+ (rg %*% WM %*% (yobs- prdKP1))
     }
@@ -884,7 +890,7 @@ It can make sens to distinguish one shot to one leave one.
     prdKP3 <span style="color: #4c83ff;">&lt;-</span> matrix(<span style="color: #D8FA3C;">NA</span>, ncol= 1, nrow= length(prdWXy))    
     <span style="color: #FBDE2D;">for</span> (i <span style="color: #FBDE2D;">in</span> 1: length(prdKP3)){
         rg <span style="color: #4c83ff;">&lt;-</span> sum.u[i, ] %*% GR[, -i] %*% solve(sum.y[-i, -i])
-        prdKP3[ i] <span style="color: #4c83ff;">&lt;-</span> prdWXy[ i]+ (rg %*% (yobs[-i ]- prdKP1[-i ]))
+        prdKP3[ i] <span style="color: #4c83ff;">&lt;-</span> prdWXy[ i]+ (rg %*% (yobs[i ]- prdKP1[-i ]))
     }
     prdKP3
 }
@@ -997,11 +1003,15 @@ powerWeigths?
 <h2 id="sec-5"><span class="section-number-2">5</span> The <code>boston</code> example</h2>
 <div class="outline-text-2" id="text-5">
 </div><div id="outline-container-sec-5-1" class="outline-3">
-<h3 id="sec-5-1"><span class="section-number-3">5.1</span> Extracting the estimation set</h3>
+<h3 id="sec-5-1"><span class="section-number-3">5.1</span> Subset the dataset</h3>
 <div class="outline-text-3" id="text-5-1">
+<p>
+and plot nb matrix
+</p>
+
 <div class="org-src-container">
 
-<pre class="src src-R"><span style="color: #4c83ff;">library</span>(spdep) ; data(boston) ; <span style="color: #4c83ff;">library</span>(rgdal)
+<pre class="src src-R" id="Lst:SWB"><span style="color: #4c83ff;">library</span>(spdep) ; data(boston) ; <span style="color: #4c83ff;">library</span>(rgdal)
 bst.sp <span style="color: #4c83ff;">&lt;-</span> readOGR(system.file(<span style="color: #61CE3C;">"etc/shapes"</span>, package= <span style="color: #61CE3C;">"spdep"</span>),
                   <span style="color: #61CE3C;">"boston_tracts"</span>, verbose= <span style="color: #D8FA3C;">FALSE</span>)
 bst.nb <span style="color: #4c83ff;">&lt;-</span> poly2nb(bst.sp) ; bst.lw <span style="color: #4c83ff;">&lt;-</span> nb2listw(bst.nb)
@@ -1027,6 +1037,10 @@ plot(ins.nb, coordinates(ins.sp), add= <span style="color: #D8FA3C;">TRUE</span>
 plot(ots.nb, coordinates(ots.sp), add= <span style="color: #D8FA3C;">TRUE</span>, col= <span style="color: #61CE3C;">"green"</span>)
 </pre>
 </div>
+
+<p>
+<a href="Figures/SpWeigthBoston.pdf">Figures/SpWeigthBoston.pdf</a>
+</p>
 </div>
 </div>
 <div id="outline-container-sec-5-2" class="outline-3">
@@ -1034,33 +1048,121 @@ plot(ots.nb, coordinates(ots.sp), add= <span style="color: #D8FA3C;">TRUE</span>
 <div class="outline-text-3" id="text-5-2">
 <div class="org-src-container">
 
-<pre class="src src-R"><span style="color: #4c83ff;">library</span>(spdep) ; data(boston)
-
-example(boston)
-<span style="color: #4c83ff;">require</span>(maptools)
-
-eqn.bst <span style="color: #4c83ff;">&lt;-</span> log(CMEDV)~ CRIM    + ZN + INDUS   + CHAS    + I(NOX^2)+
+<pre class="src src-R">eqn.bst <span style="color: #4c83ff;">&lt;-</span> log(CMEDV)~ CRIM    + ZN + INDUS   + CHAS    + I(NOX^2)+
                        I(RM^2) + AGE+ log(DIS)+ log(RAD)+ TAX     +
                        PTRATIO + B  + log(LSTAT)
-gp1 <span style="color: #4c83ff;">&lt;-</span> errorsarlm(eqn.bst, data= bst.tr, nb2listw(bst.nb), method=<span style="color: #61CE3C;">"Matrix"</span>)
-gp2 <span style="color: #4c83ff;">&lt;-</span> lagsarlm(eqn.bst, data= bst.tr, nb2listw(bst.nb), method=<span style="color: #61CE3C;">"Matrix"</span>)
-widths <span style="color: #4c83ff;">&lt;-</span> c(ID= 5L, FIPS70State= 2L, FIPS70cty= 3L, Tract70= 6L,
-            FIPS80State= 2L, FIPS80cty= 3L, f1= 7L, CTC= 6L, f2= 2L,
-            intersect1= 3L, intersect2= 3L, name= 30L)
-dta0 <span style="color: #4c83ff;">&lt;-</span> read.fwf(<span style="color: #61CE3C;">"07913-0001-Data.txt"</span>, unname(widths),
-                 col.names=names(widths), colClasses=rep(<span style="color: #61CE3C;">"character"</span>, 12), as.is=<span style="color: #D8FA3C;">TRUE</span>)
-
-
-
-plot(bst.tr)
+sem <span style="color: #4c83ff;">&lt;-</span> errorsarlm(eqn.bst, data= ins.sp, ins.lw, method= <span style="color: #61CE3C;">"Matrix"</span>)
+sxm <span style="color: #4c83ff;">&lt;-</span> errorsarlm(eqn.bst, data= ins.sp,
+                  ins.lw, etype= <span style="color: #61CE3C;">"emixed"</span>   , method= <span style="color: #61CE3C;">"Matrix"</span>)
+sar <span style="color: #4c83ff;">&lt;-</span> lagsarlm(  eqn.bst, data= ins.sp, ins.lw, method= <span style="color: #61CE3C;">"Matrix"</span>)
+sdm <span style="color: #4c83ff;">&lt;-</span> lagsarlm(  eqn.bst, data= ins.sp,
+                  ins.lw,  type= <span style="color: #61CE3C;">"mixed"</span>    , method= <span style="color: #61CE3C;">"Matrix"</span>)
+sac <span style="color: #4c83ff;">&lt;-</span> sacsarlm(  eqn.bst, data= ins.sp, ins.lw, method= <span style="color: #61CE3C;">"Matrix"</span>)
+smc <span style="color: #4c83ff;">&lt;-</span> sacsarlm(  eqn.bst, data= ins.sp,
+                  ins.lw,  type= <span style="color: #61CE3C;">"sacmixed"</span> , method= <span style="color: #61CE3C;">"Matrix"</span>)
+AIC(sem, sxm, sar, sdm, sac, smc)[, 2]
 </pre>
 </div>
+
+<pre class="example">
+[1] -150.6177 -137.7367 -143.6867 -138.6026 -148.6190 -155.1596
+</pre>
+
+<p>
+The SXM is the more parsimonious in terms of AC 
+</p>
 </div>
 </div>
 <div id="outline-container-sec-5-3" class="outline-3">
 <h3 id="sec-5-3"><span class="section-number-3">5.3</span> Predicting</h3>
+<div class="outline-text-3" id="text-5-3">
+</div><div id="outline-container-sec-5-3-1" class="outline-4">
+<h4 id="sec-5-3-1"><span class="section-number-4">5.3.1</span> Inefficient predictors</h4>
+<div class="outline-text-4" id="text-5-3-1">
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"sppred.R"</span>)
+<span style="color: #ff1493;">rmse</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(prd, mod) sqrt(mean(I(prd- mod$y)^2))
+semKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(sem) ; sxmKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(sxm) ; sarKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(sar)
+sdmKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(sdm) ; sacKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(sac) ; smcKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(smc)
+rmse(semKP1, sem) ; rmse(sxmKP1, sxm) ; rmse(sarKP1, sar)
+rmse(sdmKP1, sdm) ; rmse(sacKP1, sac) ; rmse(smcKP1, smc)
+
+semX <span style="color: #4c83ff;">&lt;-</span> sppred(sem, condset= <span style="color: #61CE3C;">"X"</span>)
+sxmX <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, condset= <span style="color: #61CE3C;">"X"</span>)
+sarX <span style="color: #4c83ff;">&lt;-</span> sppred(sar, condset= <span style="color: #61CE3C;">"X"</span>)
+sdmX <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, condset= <span style="color: #61CE3C;">"X"</span>)
+sacX <span style="color: #4c83ff;">&lt;-</span> sppred(sac, condset= <span style="color: #61CE3C;">"X"</span>)
+smcX <span style="color: #4c83ff;">&lt;-</span> sppred(smc, condset= <span style="color: #61CE3C;">"X"</span>)
+rmse(semX, sem) ; rmse(sxmX, sxm) ; rmse(sarX, sar)
+rmse(sdmX, sdm) ; rmse(sacX, sac) ; rmse(smcX, smc)
+
+semXW <span style="color: #4c83ff;">&lt;-</span> sppred(sem, condset= <span style="color: #61CE3C;">"XW"</span>)
+sxmXW <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, condset= <span style="color: #61CE3C;">"XW"</span>)
+sarXW <span style="color: #4c83ff;">&lt;-</span> sppred(sar, condset= <span style="color: #61CE3C;">"XW"</span>)
+sdmXW <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, condset= <span style="color: #61CE3C;">"XW"</span>)
+sacXW <span style="color: #4c83ff;">&lt;-</span> sppred(sac, condset= <span style="color: #61CE3C;">"XW"</span>)
+smcXW <span style="color: #4c83ff;">&lt;-</span> sppred(smc, condset= <span style="color: #61CE3C;">"XW"</span>)
+rmse(semXW, sem) ; rmse(sxmXW, sxm) ; rmse(sarXW, sar)
+rmse(sdmXW, sdm) ; rmse(sacXW, sac) ; rmse(smcXW, smc)
+
+semXWy <span style="color: #4c83ff;">&lt;-</span> sppred(sem, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sxmXWy <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sarXWy <span style="color: #4c83ff;">&lt;-</span> sppred(sar, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sdmXWy <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, condset= <span style="color: #61CE3C;">"XWy"</span>)
+sacXWy <span style="color: #4c83ff;">&lt;-</span> sppred(sac, condset= <span style="color: #61CE3C;">"XWy"</span>)
+smcXWy <span style="color: #4c83ff;">&lt;-</span> sppred(smc, condset= <span style="color: #61CE3C;">"XWy"</span>)
+rmse(semXWy, sem) ; rmse(sxmXWy, sxm) ; rmse(sarXWy, sar)
+rmse(sdmXWy, sdm) ; rmse(sacXWy, sac) ; rmse(smcXWy, smc)
+</pre>
 </div>
 </div>
+</div>
+<div id="outline-container-sec-5-3-2" class="outline-4">
+<h4 id="sec-5-3-2"><span class="section-number-4">5.3.2</span> BLUP predictors</h4>
+<div class="outline-text-4" id="text-5-3-2">
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"sppred.R"</span>)
+<span style="color: #ff1493;">rmse</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(prd, mod) sqrt(mean(I(prd- mod$y)^2))
+
+semLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sem, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sxmLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sarLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sar, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sdmLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sacLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sac, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+smcLSP <span style="color: #4c83ff;">&lt;-</span> sppred(smc, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+rmse(semLSP, sem) ; rmse(sxmLSP, sxm) ; rmse(sarLSP, sar)
+rmse(sdmLSP, sdm) ; rmse(sacLSP, sac) ; rmse(smcLSP, smc)
+
+
+semKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sem, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sxmKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sarKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sar, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sdmKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+sacKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sac, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+smcKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(smc, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
+rmse(semKP2, sem) ; rmse(sxmKP2, sxm) ; rmse(sarKP2, sar)
+rmse(sdmKP2, sdm) ; rmse(sacKP2, sac) ; rmse(smcKP2, smc)
+
+semKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sem, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
+sxmKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
+sarKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sar, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
+sdmKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
+sacKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sac, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
+smcKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(smc, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
+rmse(semKP3, sem) ; rmse(sxmKP3, sxm) ; rmse(sarKP3, sar)
+rmse(sdmKP3, sdm) ; rmse(sacKP3, sac) ; rmse(smcKP3, smc)
+
+yop <span style="color: #4c83ff;">&lt;-</span> sdmKP3- sdmXWy
+yap <span style="color: #4c83ff;">&lt;-</span> sdmLSP- sdmKP1
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+
 
 <div id="outline-container-sec-6" class="outline-2">
 <h2 id="sec-6"><span class="section-number-2">6</span> Summary</h2>

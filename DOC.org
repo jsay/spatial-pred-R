@@ -461,7 +461,7 @@ prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
     prdKP3 <- matrix(NA, ncol= 1, nrow= length(prdWXy))    
     for (i in 1: length(prdKP3)){
         rg <- sum.u[i, ] %*% GR[, -i] %*% solve(sum.y[-i, -i])
-        prdKP3[ i] <- prdWXy[ i]+ (rg %*% (yobs[-i ]- prdKP1[-i ]))
+        prdKP3[ i] <- prdWXy[ i]+ (rg %*% (yobs[i ]- prdKP1[-i ]))
     }
     prdKP3
 }
@@ -611,7 +611,6 @@ rmse(sdmXWy, sdm) ; rmse(sacXWy, sac) ; rmse(smcXWy, smc)
 
 #+end_src
 
-
 *** BLUP predictors
 
 #+begin_src R :results output exemple
@@ -646,9 +645,11 @@ smcKP3 <- sppred(smc, blup= "KP3", loo= TRUE, power= TRUE)
 rmse(semKP3, sem) ; rmse(sxmKP3, sxm) ; rmse(sarKP3, sar)
 rmse(sdmKP3, sdm) ; rmse(sacKP3, sac) ; rmse(smcKP3, smc)
 
+yop <- sdmKP3- sdmXWy
+yap <- sdmLSP- sdmKP1
+
 
 #+end_src
-
 
 
 * Testing							   :noexport:

@@ -139,7 +139,7 @@ prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
     prdKP3 <- matrix(NA, ncol= 1, nrow= length(prdWXy))    
     for (i in 1: length(prdKP3)){
         rg <- sum.u[i, ] %*% GR[, -i] %*% solve(sum.y[-i, -i])
-        prdKP3[ i] <- prdWXy[ i]+ (rg %*% (yobs[-i ]- prdKP1[-i ]))
+        prdKP3[ i] <- prdWXy[ i]+ (rg %*% (yobs[i ]- prdKP1[-i ]))
     }
     prdKP3
 }
