@@ -30,9 +30,7 @@ welcome.\\
 - Code the weight matrix for ex-sample predictions
 - Code the predictors for =sphet= and =splm= objects
 #+END_abstract
-#+LaTeX: \clearpage
 #+TOC: headlines 1
-#+LaTeX: \clearpage
 
 # "Spatial dependence, housing submarkets, and house price
 # prediction", 2007, Journal of Real Estate Finance and Economics, 35,
@@ -46,8 +44,9 @@ welcome.\\
    specification of interdependence between statistical units,
    typically from their spatial proximity.  Consequently, resulting
    predictions not only depend on the variables of the target units
-   (i.e., the units for which we want to predict the outcome) but also
-   depend on the variables of their neighbors.  This implies that the
+   (i.e., the units for which we want to predict the outcome) but
+   potentially involve the entire set of both explanatory as well as
+   dependent variable sample data observations.  This implies that the
    sample pattern of the outcomes or the residuals contains additional
    information which may be used to modify the regression function so
    as to reduce the prediction variance (Goldberger 1962). [[cite:COrd73]]
@@ -408,7 +407,7 @@ prdLSP <- function(prdKP1, rho= rho, lab= lab,
         prdLSP <- matrix(NA, ncol= 1, nrow= length(prdKP1))
         for (i in 1: length(prdKP1)){
             prdLSP[ i] <- prdKP1[ i]-
-                (P22[-i, i] %*% (yobs[ -i]- prdKP1[ -i])/ P22[i, i])
+                (P22[i, -i] %*% (yobs[ -i]- prdKP1[ -i])/ P22[i, i])
         }
     } else {
         P11 <- P22
@@ -618,12 +617,36 @@ source("sppred.R")
 rmse <- function(prd, mod) sqrt(mean(I(prd- mod$y)^2))
 
 semLSP <- sppred(sem, blup= "LSP", loo= TRUE)
+rmse(semLSP, sem)
+semKP2 <- sppred(sem, blup= "KP2", loo= TRUE, power= TRUE)
+rmse(semKP2, sem)
+semKP3 <- sppred(sem, blup= "KP3", loo= TRUE, power= TRUE)
+rmse(semKP3, sem)
+
+sarLSP <- sppred(sar, blup= "LSP", loo= TRUE)
+rmse(sarLSP, sar)
+sarKP2 <- sppred(sar, blup= "KP2", loo= TRUE, power= TRUE)
+rmse(sarKP2, sar)
+sarKP3 <- sppred(sar, blup= "KP3", loo= TRUE, power= TRUE)
+rmse(sarKP3, sar)
+
+
+sdmLSP <- sppred(sdm, blup= "LSP", loo= TRUE)
+rmse(sdmLSP, sem)
+sdmKP2 <- sppred(sdm, blup= "KP2", loo= TRUE, power= TRUE)
+rmse(sdmKP2, sem)
+sdmKP3 <- sppred(sdm, blup= "KP3", loo= TRUE, power= TRUE)
+rmse(sdmKP3, sem)
+
+
+
 sxmLSP <- sppred(sxm, blup= "LSP", loo= TRUE)
 sarLSP <- sppred(sar, blup= "LSP", loo= TRUE)
 sdmLSP <- sppred(sdm, blup= "LSP", loo= TRUE)
 sacLSP <- sppred(sac, blup= "LSP", loo= TRUE)
 smcLSP <- sppred(smc, blup= "LSP", loo= TRUE)
-rmse(semLSP, sem) ; rmse(sxmLSP, sxm) ; rmse(sarLSP, sar)
+
+; rmse(sxmLSP, sxm) ; rmse(sarLSP, sar)
 rmse(sdmLSP, sdm) ; rmse(sacLSP, sac) ; rmse(smcLSP, smc)
 
 
@@ -650,7 +673,6 @@ yap <- sdmLSP- sdmKP1
 
 
 #+end_src
-
 
 * Testing							   :noexport:
 ** Sample

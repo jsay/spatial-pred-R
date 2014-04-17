@@ -94,7 +94,7 @@ prdLSP <- function(prdKP1, rho= rho, lab= lab,
         prdLSP <- matrix(NA, ncol= 1, nrow= length(prdKP1))
         for (i in 1: length(prdKP1)){
             prdLSP[ i] <- prdKP1[ i]-
-                (P22[-i, i] %*% (yobs[ -i]- prdKP1[ -i])/ P22[i, i])
+                (P22[i, -i] %*% (yobs[ -i]- prdKP1[ -i])/ P22[i, i])
         }
     } else {
         P11 <- P22
