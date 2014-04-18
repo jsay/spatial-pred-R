@@ -513,18 +513,10 @@ prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
 #+begin_src R :results output exemple
 library(spdep) ; data(boston) ; library(rgdal)
 bst.sp <- readOGR(system.file("etc/shapes", package= "spdep"), "boston_tracts")
-bst.nb <- poly2nb(bst.sp) ; bst.lw <- nb2listw(bst.nb)
 set.seed(84) ; cal <- unique(round(runif(250)* 500))
 bst.sp$SMP <- "OS" ; bst.sp$SMP[cal] <- "IS"
-## DROPPING THE UNITS WITHOUT NEIGHBORS
-tst.sp <- subset(bst.sp, bst.sp$SMP== "IS")
-tst.nb <- subset(bst.nb, bst.sp$SMP== "IS")
-ins.sp <- subset(tst.sp, card(tst.nb)!= 0)
-ins.nb <- subset(tst.nb, card(tst.nb)!= 0)
-tst.sp <- subset(bst.sp, bst.sp$SMP== "OS")
-tst.nb <- subset(bst.nb, bst.sp$SMP== "OS")
-ots.sp <- subset(tst.sp, card(tst.nb)!= 0)
-ots.nb <- subset(tst.nb, card(tst.nb)!= 0)
+ins.sp <- subset(bst.sp, bst.sp$SMP== "IS")
+ots.sp <- subset(bst.sp, bst.sp$SMP== "OS")
 cbind("ALL"= dim(bst.sp), "IN-SMP"= dim(ins.sp), "OUT-SMP"= dim(ots.sp))
 #+end_src
 
@@ -534,43 +526,54 @@ cbind("ALL"= dim(bst.sp), "IN-SMP"= dim(ins.sp), "OUT-SMP"= dim(ots.sp))
 : with 506 features and 21 fields
 : Feature type: wkbPolygon with 2 dimensions
 :      ALL IN-SMP OUT-SMP
-: [1,] 506    198     289
+: [1,] 506    211     295
 : [2,]  22     22      22
 
+   Spatial units without neighbors are kept in these spatial
+   data.frames.
+
 ** Neighborhood relationships
+
+   The issue is now to build the =nb= object with the green
+   links. Because of the symmetries, we can do that by elimination. We
+   have a strong difference with the classical =subset.nb= matrix
+   because some absent units have to be referred by present units. So
+   we do not change the dimension of the =nb= matrix, we put 0s
+   instead.
+
+   To this work about spatial weights, we create our own subset
+   functions (see XX).
+
+# LES ILOTS "IS" NE PEUVENT PAS ETRE UTILISES POUR ESTIMER LE MODELE
+# MAIS PEUVENT ETRE UTILE POUR PREDIRE
+
+# Il ne faut pas que je change les id et donc la dimension il faut
+# simplement mettre de zéro? Et ensuite à partir d'autres subsets sur
+# cette matrice on devrait obtenir la bonne dimension. Dans cette
+# deuxième étape on devrait alors enlever les ilots.
 
    and plot nb matrix
 
 #+Name: Lst:SWB
 #+Header: :width 7 :height 7
 #+begin_src R :results graphics :file "Figures/SpWeigthBoston.pdf"
-
-library(spdep) ; data(boston) ; library(rgdal)
-bst.sp <- readOGR(system.file("etc/shapes", package= "spdep"), "boston_tracts")
+source("spsubset.R")
 bst.nb <- poly2nb(bst.sp) ; bst.lw <- nb2listw(bst.nb)
-set.seed(84) ; cal <- unique(round(runif(250)* 500))
-bst.sp$SMP <- "OS" ; bst.sp$SMP[cal] <- "IS"
-## DROPPING THE UNITS WITHOUT NEIGHBORS
-tst.sp <- subset(bst.sp, bst.sp$SMP== "IS")
-tst.nb <- subset(bst.nb, bst.sp$SMP== "IS")
-ins.sp <- subset(tst.sp, card(tst.nb)!= 0)
-ins.nb <- subset(tst.nb, card(tst.nb)!= 0)
-tst.sp <- subset(bst.sp, bst.sp$SMP== "OS")
-tst.nb <- subset(bst.nb, bst.sp$SMP== "OS")
-ots.sp <- subset(tst.sp, card(tst.nb)!= 0)
-ots.nb <- subset(tst.nb, card(tst.nb)!= 0)
-cbind("ALL"= dim(bst.sp), "IN-SMP"= dim(ins.sp), "OUT-SMP"= dim(ots.sp))
-
-
-par(mar= c(0, 0, 0, 0)) ; plot(bst.sp, border= FALSE)
-plot(ins.sp, col= "grey30", add= TRUE, border= FALSE)
+W11 <- nbsubset(bst.nb, bst.sp$SMP== "IS", target= bst.sp$SMP== "IS")
+W12 <- nbsubset(bst.nb, bst.sp$SMP== "IS", target= bst.sp$SMP== "OS")
+W21 <- nbsubset(bst.nb, bst.sp$SMP== "OS", target= bst.sp$SMP== "IS")
+W22 <- nbsubset(bst.nb, bst.sp$SMP== "OS", target= bst.sp$SMP== "OS")
+par(mar= c(0, 0, 0, 0)) ; plot(bst.sp, lwd= 5)
 plot(ots.sp, col= "grey70", add= TRUE, border= FALSE)
-plot(bst.nb, coordinates(bst.sp), add= T, col= "green", pch= 20, cex= .2)
-plot(ins.nb, coordinates(ins.sp), add= T, col= "blue" , pch= 20, cex= .2)
-plot(ots.nb, coordinates(ots.sp), add= T, col= "red"  , pch= 20, cex= .2)
-legend("topleft", col= c("green", "blue", "red"), lwd= 1.5,
-       c("PRD NBH", "IS NBH", "OS NBH"))
-legend("right", fill= c("grey30", "grey70"), c("IN-SAMPLE", "OUT-OF-SAMPLE"))
+plot(ins.sp, col= "grey30", add= TRUE, border= FALSE)
+plot(bst.nb, coordinates(bst.sp), add= T, col= "black" , pch= 20, cex= .2)
+plot(W11, coordinates(bst.sp), add= T, col= "green", pch= 20, cex= .2)
+plot(W12, coordinates(bst.sp), add= T, col= "blue", pch= 20, cex= .2)
+plot(W22, coordinates(bst.sp), add= T, col= "red", pch= 20, cex= .2)
+legend("topleft", col= c("blue", "green", "red"), lwd= 1.5,
+       c("PRD NBH", "IS NBH", "OS NBH"), bty= "n", cex= 1.25)
+legend("right", fill= c("grey30", "grey70"),
+       c("IN-SAMPLE", "OUT-OF-SAMPLE"), bty= "n", cex= 1.25)
 #+end_src
 
 #+Name: Fig:SWB
@@ -586,123 +589,37 @@ legend("right", fill= c("grey30", "grey70"), c("IN-SAMPLE", "OUT-OF-SAMPLE"))
    information transmission between units. Be careful about the island
    that present yellow links (see at the bottom right).
 
-   The issue is now to build the =nb= object with the green
-   links. Because of the symmetries, we can do that by elimination.
-
-#+begin_src R :results output exemple
-
-
-
-bst.sp <- readOGR(system.file("etc/shapes", package= "spdep"),
-                  "boston_tracts", verbose= FALSE)
-bst.nb <- poly2nb(bst.sp) ; bst.lw <- nb2listw(bst.nb)
-set.seed(84) ; cal <- unique(round(runif(250)* 500))
-bst.sp$SMP <- "OS" ; bst.sp$SMP[cal] <- "IS" ;
-tst.sp <- subset(bst.sp, bst.sp$SMP== "IS")
-tst.nb <- poly2nb(tst.sp) ; ins.sp <- subset(tst.sp, card(tst.nb)!= 0)
-ins.nb <- poly2nb(ins.sp) ; ins.lw <- nb2listw(ins.nb)
-tst.sp <- subset(bst.sp, bst.sp$SMP== "OS")
-tst.nb <- poly2nb(tst.sp) ; ots.sp <- subset(tst.sp, card(tst.nb)!= 0)
-ots.nb <- poly2nb(ots.sp) ; ost.lw <- nb2listw(ots.nb)
-
-
-bst <- data.frame(A= rep(row.names(bst.sp), card(bst.nb)), B= unlist(bst.nb))
-ins <- data.frame(A= rep(row.names(ins.sp), card(ins.nb)), B= unlist(ins.nb))
-ots <- data.frame(A= rep(row.names(ots.sp), card(ots.nb)), B= unlist(ots.nb))
-ins$ins <- 1 ; ots$ots <- 1
-yop <- data.frame(merge(bst, ins, by= c("A", "B"), all.x= TRUE),
-                  "ots"= merge(bst, ots, by= c("A", "B"), all.x= TRUE)[, 3])
-
-
-bst.mt <- data.frame("ID"= rep(row.names(bst.sp), card(bst.nb)),
-                     "NBH"= unlist(bst.nb))
-ins.mt <- data.frame("ID"= rep(row.names(ins.sp), card(ins.nb)),
-                     "NH"= unlist(ins.nb), "IS"= 1)
-ots.mt <- data.frame("ID"= rep(row.names(ots.sp), card(ots.nb)),
-                     "NH"= unlist(ots.nb), "OS"= 1)
-tmpi <- data.frame("NBH"= row.names(ins.sp),
-                   "NH"= 1: length(row.names(ins.sp)))
-tmpo <- data.frame("NBH"= row.names(ots.sp),
-                   "NH"= 1: length(row.names(ots.sp)))
-
-att <- subset(bst.nb, row.names(bst.sp) %in% row.names(tst.sp))
-
-cal
-cal <- unique(round(runif(250)* 500)),
-
-ins <- merge(ins.mt, tmpi, by= c("NH"))[, -1]
-ots <- merge(ots.mt, tmpo, by= c("NH"))[, -1]
-
-
-yop <- merge(bst.mt, ins, by= c("ID", "NBH"), all.x= TRUE)
-yap <- merge(bst.mt, ots, by= c("ID", "NBH"), all.x= TRUE)
-
-
-plot(bst.sp[379: 385, ])
-text(coordinates(bst.sp), row.names(bst.sp), col ="blue")
-
-text(coordinates(ins.sp), row.names(ins.sp), col ="red")
-
-
-head(bst.nb[ 382])
-
-row.names(ins.nb)
-
-length(unlist(bst.nb))
-
-length(unlist(ins.nb))
-length(unlist(ots.nb))
-
-#+end_src
-
 ** Subset weight matrix
 
    To subset a weight matrix symmetrically as it is the case actually,
    we can select only attributes of focal point and target
    point. define Focal and target slots.
 
-#+begin_src R :tangle yes ./spsubset.R
-spsubset <- function (x, focal, target= NULL, ...){
-
-    x <- ins.nb
-    focal <- 1: 289< 125
-    target <- 1: 289> 120
-    
+#+begin_src R :tangle ./spsubset.R
+nbsubset <- function (x, focal= rep(TRUE, length(x)),
+                      target= rep(TRUE, length(x)), ...){
     if (!inherits(x, "nb")) 
         stop("not a neighbours list")
     if (!is.logical(focal)) 
         stop("subset not a logical vector")
+    if (!is.logical(target)) 
+        stop("target not a logical vector")
     n <- length(x)
     if (n != length(focal)) 
         stop("neighours list and subset focal different lengths")
     if (n != length(target)) 
         stop("neighours list and subset target different lengths")
-    old.ids <- 1: n
-    new.ids <- match(old.ids, which(focal))
-    reg.id <- subset.default(attr(x, "region.id"), focal)
+    tgt.ids <- seq(1, n)[ target]
     x <- sym.attr.nb(x)
     xattrs <- names(attributes(x))
-    z <- subset.default(x, focal)
-    nz <- length(z)
-    for (i in 1: nz){
-
-        i <- 1
-        zi <- z[[i]]
-        res <- NULL
-        if (!(length(zi) == 1L & zi[1] == 0)) {
-
-            
-            for (j in seq(along = zi)) {
-                a <- new.ids[zi[j]]
-                if (!is.na(a)) 
-                  res <- c(res, a)
-            }
-        }
-        if (is.null(res)) 
-            z[[i]] <- 0L
-        else z[[i]] <- sort(unique(res))
+    z <- ifelse(focal, x, 0L)
+    for (i in seq(along= 1: n)[ focal]){
+        zi <- z[[ i]]
+        zn <- zi[zi %in% tgt.ids]
+        if (length(zn)== 0) z[[ i]] <- 0L
+        else z[[ i]] <- sort(unique(zn))
     }
-    attr(z, "region.id") <- reg.id
+    attr(z, "region.id") <-attr(x, "region.id")
     for (i in 1:length(xattrs)) {
         if (xattrs[i] != "region.id") 
             attr(z, xattrs[i]) <- attr(x, xattrs[i])
@@ -710,10 +627,40 @@ spsubset <- function (x, focal, target= NULL, ...){
     z <- sym.attr.nb(z)
     z
 }
-<environment: namespace:spdep>
 #+end_src
 
+   And the corresponding function for the =listw= objects, be careful
+   about symmetry
 
+#+begin_src R :tangle ./spsubset.R
+lwsubset <- function (x, focal= rep(TRUE, length(x)),
+                      target= rep(TRUE, length(x)), zero.policy = NULL, ...){
+    if (!inherits(x, "listw")) 
+        stop("not a weights list")
+    if (is.null(zero.policy)) 
+        zero.policy <- get("zeroPolicy", envir = .spdepOptions)
+    stopifnot(is.logical(zero.policy))
+    if (!is.logical(focal)) 
+        stop("focal not a logical vector")
+    if (!is.logical(target)) 
+        stop("target not a logical vector")
+    nb <- x$neighbours
+    vlist <- x$weights
+    if (attr(vlist, "mode") != "binary") 
+        stop("Not yet able to subset general weights lists")
+    style <- x$style
+    n <- length(nb)
+    if (n != length(focal)) 
+        stop("neighbours list and focal vector different lengths")
+    if (n != length(target)) 
+        stop("neighbours list and target vector different lengths")
+    subnb <- nbsubset(nb, focal, target)
+    sublistw <- nb2listw(neighbours= subnb, glist= NULL,
+                         style= style, zero.policy= zero.policy)
+    sublistw
+}
+#+end_src
+ 
 
 ** Estimating the models
 
