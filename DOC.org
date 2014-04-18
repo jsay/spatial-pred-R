@@ -32,10 +32,14 @@ welcome.\\
 #+END_abstract
 #+TOC: headlines 1
 
-# "Spatial dependence, housing submarkets, and house price
-# prediction", 2007, Journal of Real Estate Finance and Economics, 35,
-# pp. 143-160, with Bourassa, S.C. and Cantoni, E.
-# Pas de prédicteurs BLUP
+  # @Article{RePEc:eee:jhouse:v:21:y:2012:i:1:p:66-76,
+  # author={Kato, Takafumi},
+  # title={{Prediction in the lognormal regression model with spatial error dependence}},
+  # journal={Journal of Housing Economics},
+  # year=2012,
+  # volume={21},
+  # number={1},
+  # pages={66-76}
 
 * Theoretical Framework
 ** Spatial econometric models
@@ -105,34 +109,39 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
 \end{equation}
 
    with $\mu=(I-\rho W)^{-1}X\beta$, and $\Sigma= \big[(I-\rho
-   W)(I-\lambda W)(I-\lambda W^\top)(I-\rho W^\top)\big]^{-1}$.
-   According to the literature, we consider hereafter that the set of
-   parameters $\Theta$ is known with certainty.  This has the
-   advantage of simplifying notations by neglecting a source of
-   uncertainty that depends on the sample size.  Moreover, all the
-   parameters are estimated simultaneously and it makes no sens to
-   consider $\Theta$ as partially known.  Hence, the predictors
-   presented are all conditioned by $\Theta$, which is dropped from
-   conditioning sets for the sake of clarity. So its not the true BLUP
-   but an approximation.
+   W)(I-\lambda W)(I-\lambda W^\top)(I-\rho W^\top)\big]^{-1}$.  With
+   this writing, we can distinguish the non-stochastic and the
+   stochastic components of the observations, which are of central
+   interest in unifying the different predictors.  According to the
+   literature, we consider hereafter that the set of parameters
+   $\Theta$ is known with certainty.  This has the advantage of
+   simplifying notations by neglecting a source of uncertainty that
+   depends on the sample size.  Moreover, all the parameters are
+   estimated simultaneously and it makes no sens to consider $\Theta$
+   as partially known.  Hence, the predictors presented are all
+   conditioned by $\Theta$, which is dropped from conditioning sets
+   for the sake of clarity. So its not the true BLUP but an
+   approximation.
 
-   Finally, note that geo-statistical models (Cressie 1990) usually
-   involve specifying spatial dependence through the error process
-   (like in SEM or SXM) as opposed to the spatial lag of the outcome
-   vector (like in SAR or SDM). Predicting from these error models
-   take a simpler form than autoregressive models and can be easily
-   recovered from the theoretical framework presented here. The
-   reverse is not true.
+   Finally, note that geo-statistical models (typically from the
+   kriging methods, \cite{CCas93}) are aware about the need for using
+   BLUP predictors.  Relatively to spatial econometric approaches,
+   they involve specifying spatial dependence through the error
+   process (like in spatial error models, see below) as opposed to the
+   spatial lag of the outcome vector.  Predicting from these error
+   models take a simpler form than autoregressive models and can be
+   easily recovered from the theoretical framework presented here. The
+   reverse is not true.[fn:3]
 
 ** Implementing predictions
 
    Basically, we consider $M$ target spatial units for which we want
    to predict the values of the outcome $y$.  These units may or may
    not be included in the dataset used for the estimation of the
-   parameters. At this moment, it makes no differences and we
-   distinguish them only in the research interest of obtaining
-   predictions of $y$.[fn:2]  We discuss this point in more details at the
-   next subsection XX.
+   parameters (that we call focal units).  At this moment, it makes no
+   differences and we distinguish them only in the research interest
+   of obtaining predictions of $y$.[fn:2] We discuss this point in
+   more details at the next subsection XX.
 
    The available information set is crucial here, as each predictor is
    formulated as a conditional expectation relative to it. 
@@ -190,6 +199,14 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
 
    This simplification comes from...
 
+   Note that this predictor is not consistent in terms of expectation
+   conditioned by a unique information set. In effect, the
+   non-stochastic part is conditioned without the knowledge of the
+   outcome variable, which is nevertheless necessary to compute the
+   BLUP correction of the stochastic part. This misleading appears
+   because of the writing of the reduced form before taking the
+   conditional expectation.
+
 \begin{equation}
 \tag{prdKP2}\mathbf{E}(y_i\mid X, W, y_{IS})= \rho Wy+ X\widehat{\beta}+ WX\widehat{\theta} 
                                             +  \Omega_{21}\Omega_{11}^{-1}(y_{IS}-\mathbf{E}(y_{IS}\mid X, W))
@@ -205,7 +222,6 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
    If we put aside the differences in the conditional mean of the
    exogenous part, this predictor =predKP2= is identical to [[ref:prdLSP][prdLSP]].
 
-
    Can we still maintain the signal trend distinction? Does it the
    same as direct and indirect effects of covariates?
 
@@ -215,6 +231,8 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
    We implement the KP1 predictors, also called exogenous by LeSage
    and Pace.
 
+   Custom predictors, see for example \cite{TALG13}
+
    We have to explain the differences between in-sample, out-of-sample
    and ex-sample in a spatial context. Ex-sample is not necessary
    linked to temporal, it is also interesting to counterfactual
@@ -223,7 +241,10 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
    sampled neighbors does not mean no neighbors. But in a spatial
    segregative case, this corresponds to a ex-sample case.
 
-** A taxonomy of spatial predictions
+   In the applied literature, one can found KP2 in Dubin (models?), KP4
+   in \cite{BCHo07} (models?), LSP in Kato (models?)
+
+** A taxonomy of spatial sample schemes
 
    In spatial econometrics, the usual distinction between in-sample
    (IS) and out-of-sample (OS) predictions has firstly to be
@@ -510,6 +531,12 @@ prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
 * The =boston= example
 ** The spatial samples
 
+   We use here the =boston= dataset, available from the =spdep=
+   package (Bivand 2014). It consists in XX. From the whole sample, we
+   draw randomly 211 observations from 250 drawn of a uniform
+   distribution and dropping duplicated units. This allows to
+   distinguish two sample: IS and OS.
+
 #+begin_src R :results output exemple
 library(spdep) ; data(boston) ; library(rgdal)
 bst.sp <- readOGR(system.file("etc/shapes", package= "spdep"), "boston_tracts")
@@ -517,7 +544,7 @@ set.seed(84) ; cal <- unique(round(runif(250)* 500))
 bst.sp$SMP <- "OS" ; bst.sp$SMP[cal] <- "IS"
 ins.sp <- subset(bst.sp, bst.sp$SMP== "IS")
 ots.sp <- subset(bst.sp, bst.sp$SMP== "OS")
-cbind("ALL"= dim(bst.sp), "IN-SMP"= dim(ins.sp), "OUT-SMP"= dim(ots.sp))
+cbind("ALL"= dim(bst.sp), "IN SMP"= dim(ins.sp), "OUT SMP"= dim(ots.sp))
 #+end_src
 
 #+RESULTS:
@@ -534,42 +561,33 @@ cbind("ALL"= dim(bst.sp), "IN-SMP"= dim(ins.sp), "OUT-SMP"= dim(ots.sp))
 
 ** Neighborhood relationships
 
-   The issue is now to build the =nb= object with the green
-   links. Because of the symmetries, we can do that by elimination. We
-   have a strong difference with the classical =subset.nb= matrix
-   because some absent units have to be referred by present units. So
-   we do not change the dimension of the =nb= matrix, we put 0s
-   instead.
-
-   To this work about spatial weights, we create our own subset
-   functions (see XX).
-
-# LES ILOTS "IS" NE PEUVENT PAS ETRE UTILISES POUR ESTIMER LE MODELE
-# MAIS PEUVENT ETRE UTILE POUR PREDIRE
-
-# Il ne faut pas que je change les id et donc la dimension il faut
-# simplement mettre de zéro? Et ensuite à partir d'autres subsets sur
-# cette matrice on devrait obtenir la bonne dimension. Dans cette
-# deuxième étape on devrait alors enlever les ilots.
-
-   and plot nb matrix
+   The following code use the function =nbsubset= described in
+   Appendix XX and tangled in the file =spsubset.R=. As it is shown by
+   the following Figure XX, this function allows to compute the =nb=
+   equivalent to the spatial weight matrix $W_I$, $W_O$, $W_{IO}$ and
+   $W_{OI}$. The logic behind =nbsubset= is rather different than the
+   classical =subset.nb= function because some absent units have to be
+   referred by present units. So we do not change the dimension of the
+   =nb= matrix, we put some 0 instead but this leads to some problems
+   to compute the spatial weights after (see the commentaries in
+   Appendix [[SFL]]).
 
 #+Name: Lst:SWB
 #+Header: :width 7 :height 7
 #+begin_src R :results graphics :file "Figures/SpWeigthBoston.pdf"
 source("spsubset.R")
 bst.nb <- poly2nb(bst.sp) ; bst.lw <- nb2listw(bst.nb)
-W11 <- nbsubset(bst.nb, bst.sp$SMP== "IS", target= bst.sp$SMP== "IS")
-W12 <- nbsubset(bst.nb, bst.sp$SMP== "IS", target= bst.sp$SMP== "OS")
-W21 <- nbsubset(bst.nb, bst.sp$SMP== "OS", target= bst.sp$SMP== "IS")
-W22 <- nbsubset(bst.nb, bst.sp$SMP== "OS", target= bst.sp$SMP== "OS")
+WII <- nbsubset(bst.nb, bst.sp$SMP== "IS", target= bst.sp$SMP== "IS")
+WIO <- nbsubset(bst.nb, bst.sp$SMP== "IS", target= bst.sp$SMP== "OS")
+WOI <- nbsubset(bst.nb, bst.sp$SMP== "OS", target= bst.sp$SMP== "IS")
+WOO <- nbsubset(bst.nb, bst.sp$SMP== "OS", target= bst.sp$SMP== "OS")
 par(mar= c(0, 0, 0, 0)) ; plot(bst.sp, lwd= 5)
 plot(ots.sp, col= "grey70", add= TRUE, border= FALSE)
 plot(ins.sp, col= "grey30", add= TRUE, border= FALSE)
 plot(bst.nb, coordinates(bst.sp), add= T, col= "black" , pch= 20, cex= .2)
-plot(W11, coordinates(bst.sp), add= T, col= "green", pch= 20, cex= .2)
-plot(W12, coordinates(bst.sp), add= T, col= "blue", pch= 20, cex= .2)
-plot(W22, coordinates(bst.sp), add= T, col= "red", pch= 20, cex= .2)
+plot(WII, coordinates(bst.sp), add= T, col= "green", pch= 20, cex= .2)
+plot(WIO, coordinates(bst.sp), add= T, col= "blue" , pch= 20, cex= .2)
+plot(WOO, coordinates(bst.sp), add= T, col= "red"  , pch= 20, cex= .2)
 legend("topleft", col= c("blue", "green", "red"), lwd= 1.5,
        c("PRD NBH", "IS NBH", "OS NBH"), bty= "n", cex= 1.25)
 legend("right", fill= c("grey30", "grey70"),
@@ -589,206 +607,95 @@ legend("right", fill= c("grey30", "grey70"),
    information transmission between units. Be careful about the island
    that present yellow links (see at the bottom right).
 
-** Subset weight matrix
+   LES ILOTS "IS" NE PEUVENT PAS ETRE UTILISES POUR ESTIMER LE MODELE
+   MAIS PEUVENT ETRE UTILE POUR PREDIRE
 
-   To subset a weight matrix symmetrically as it is the case actually,
-   we can select only attributes of focal point and target
-   point. define Focal and target slots.
+   Il ne faut pas que je change les id et donc la dimension il faut
+   simplement mettre de zéro? Et ensuite à partir d'autres subsets sur
+   cette matrice on devrait obtenir la bonne dimension. Dans cette
+   deuxième étape on devrait alors enlever les ilots.
 
-#+begin_src R :tangle ./spsubset.R
-nbsubset <- function (x, focal= rep(TRUE, length(x)),
-                      target= rep(TRUE, length(x)), ...){
-    if (!inherits(x, "nb")) 
-        stop("not a neighbours list")
-    if (!is.logical(focal)) 
-        stop("subset not a logical vector")
-    if (!is.logical(target)) 
-        stop("target not a logical vector")
-    n <- length(x)
-    if (n != length(focal)) 
-        stop("neighours list and subset focal different lengths")
-    if (n != length(target)) 
-        stop("neighours list and subset target different lengths")
-    tgt.ids <- seq(1, n)[ target]
-    x <- sym.attr.nb(x)
-    xattrs <- names(attributes(x))
-    z <- ifelse(focal, x, 0L)
-    for (i in seq(along= 1: n)[ focal]){
-        zi <- z[[ i]]
-        zn <- zi[zi %in% tgt.ids]
-        if (length(zn)== 0) z[[ i]] <- 0L
-        else z[[ i]] <- sort(unique(zn))
-    }
-    attr(z, "region.id") <-attr(x, "region.id")
-    for (i in 1:length(xattrs)) {
-        if (xattrs[i] != "region.id") 
-            attr(z, xattrs[i]) <- attr(x, xattrs[i])
-    }
-    z <- sym.attr.nb(z)
-    z
-}
-#+end_src
-
-   And the corresponding function for the =listw= objects, be careful
-   about symmetry
-
-#+begin_src R :tangle ./spsubset.R
-lwsubset <- function (x, focal= rep(TRUE, length(x)),
-                      target= rep(TRUE, length(x)), zero.policy = NULL, ...){
-    if (!inherits(x, "listw")) 
-        stop("not a weights list")
-    if (is.null(zero.policy)) 
-        zero.policy <- get("zeroPolicy", envir = .spdepOptions)
-    stopifnot(is.logical(zero.policy))
-    if (!is.logical(focal)) 
-        stop("focal not a logical vector")
-    if (!is.logical(target)) 
-        stop("target not a logical vector")
-    nb <- x$neighbours
-    vlist <- x$weights
-    if (attr(vlist, "mode") != "binary") 
-        stop("Not yet able to subset general weights lists")
-    style <- x$style
-    n <- length(nb)
-    if (n != length(focal)) 
-        stop("neighbours list and focal vector different lengths")
-    if (n != length(target)) 
-        stop("neighbours list and target vector different lengths")
-    subnb <- nbsubset(nb, focal, target)
-    sublistw <- nb2listw(neighbours= subnb, glist= NULL,
-                         style= style, zero.policy= zero.policy)
-    sublistw
-}
-#+end_src
- 
+   Une autre possibilité serait de spécifier la matrice avec tout le
+   monde, la traduire en W et sélectionner les lignes et les colonnes
+   qui nous intéressent.
 
 ** Estimating the models
 
+   We estimate on the IS sample the 6 spatial econometric models from
+   the =spdep= package, with the classical specification presented in
+   Bivand (2002). Before the estimation (and to be OK with the
+   computation of spatial weights) we have to drop some units without
+   neighbors with the help of the =card= function.
+
 #+begin_src R :results output exemple
+## DROP OUT THE UNITS WITHOUT NEIGHBORS
+ins.lw <- subset(bst.lw, card(WII)!= 0) 
+inz.sp <- subset(bst.sp, card(WII)!= 0)
+## DEFINE THE MODEL SPECIFICATION
 eqn.bst <- log(CMEDV)~ CRIM    + ZN + INDUS   + CHAS    + I(NOX^2)+
                        I(RM^2) + AGE+ log(DIS)+ log(RAD)+ TAX     +
                        PTRATIO + B  + log(LSTAT)
-sem <- errorsarlm(eqn.bst, data= ins.sp, ins.lw, method= "Matrix")
-sxm <- errorsarlm(eqn.bst, data= ins.sp,
+## ESTIMATE THE MODELS AND REPORT THE AICs
+sem <- errorsarlm(eqn.bst, data= inz.sp, ins.lw, method= "Matrix")
+sxm <- errorsarlm(eqn.bst, data= inz.sp,
                   ins.lw, etype= "emixed"   , method= "Matrix")
-sar <- lagsarlm(  eqn.bst, data= ins.sp, ins.lw, method= "Matrix")
-sdm <- lagsarlm(  eqn.bst, data= ins.sp,
+sar <- lagsarlm(  eqn.bst, data= inz.sp, ins.lw, method= "Matrix")
+sdm <- lagsarlm(  eqn.bst, data= inz.sp,
                   ins.lw,  type= "mixed"    , method= "Matrix")
-sac <- sacsarlm(  eqn.bst, data= ins.sp, ins.lw, method= "Matrix")
-smc <- sacsarlm(  eqn.bst, data= ins.sp,
+sac <- sacsarlm(  eqn.bst, data= inz.sp, ins.lw, method= "Matrix")
+smc <- sacsarlm(  eqn.bst, data= inz.sp,
                   ins.lw,  type= "sacmixed" , method= "Matrix")
-AIC(sem, sxm, sar, sdm, sac, smc)[, 2]
+spmod <- list(sem= sem, sxm= sxm, sar= sar, sdm= sdm, sac= sac, smc= smc)
+data.frame(lapply(spmod, AIC))
 #+end_src
 
 #+RESULTS:
-: [1] -150.6177 -137.7367 -143.6867 -138.6026 -148.6190 -155.1596
+:         sem       sxm       sar       sdm       sac       smc
+: 1 -132.4525 -164.1509 -139.7872 -163.6526 -142.8058 -163.1881
 
    The SXM is the more parsimonious in terms of AC 
 
-** Predicting
-*** Inefficient predictors
+** Predicting for in-sample
 
-#+begin_src R :results output exemple
-source("sppred.R")
+   We next compute the RMSE for each model $\times$ predictor
+   combination.
+
+#+begin_src R :results value exemple :rownames yes :colnames yes
+source("sppred.R") ; library(plyr)
 rmse <- function(prd, mod) sqrt(mean(I(prd- mod$y)^2))
-semKP1 <- sppred(sem) ; sxmKP1 <- sppred(sxm) ; sarKP1 <- sppred(sar)
-sdmKP1 <- sppred(sdm) ; sacKP1 <- sppred(sac) ; smcKP1 <- sppred(smc)
-rmse(semKP1, sem) ; rmse(sxmKP1, sxm) ; rmse(sarKP1, sar)
-rmse(sdmKP1, sdm) ; rmse(sacKP1, sac) ; rmse(smcKP1, smc)
-
-semX <- sppred(sem, condset= "X")
-sxmX <- sppred(sxm, condset= "X")
-sarX <- sppred(sar, condset= "X")
-sdmX <- sppred(sdm, condset= "X")
-sacX <- sppred(sac, condset= "X")
-smcX <- sppred(smc, condset= "X")
-rmse(semX, sem) ; rmse(sxmX, sxm) ; rmse(sarX, sar)
-rmse(sdmX, sdm) ; rmse(sacX, sac) ; rmse(smcX, smc)
-
-semXW <- sppred(sem, condset= "XW")
-sxmXW <- sppred(sxm, condset= "XW")
-sarXW <- sppred(sar, condset= "XW")
-sdmXW <- sppred(sdm, condset= "XW")
-sacXW <- sppred(sac, condset= "XW")
-smcXW <- sppred(smc, condset= "XW")
-rmse(semXW, sem) ; rmse(sxmXW, sxm) ; rmse(sarXW, sar)
-rmse(sdmXW, sdm) ; rmse(sacXW, sac) ; rmse(smcXW, smc)
-
-semXWy <- sppred(sem, condset= "XWy")
-sxmXWy <- sppred(sxm, condset= "XWy")
-sarXWy <- sppred(sar, condset= "XWy")
-sdmXWy <- sppred(sdm, condset= "XWy")
-sacXWy <- sppred(sac, condset= "XWy")
-smcXWy <- sppred(smc, condset= "XWy")
-rmse(semXWy, sem) ; rmse(sxmXWy, sxm) ; rmse(sarXWy, sar)
-rmse(sdmXWy, sdm) ; rmse(sacXWy, sac) ; rmse(smcXWy, smc)
-
+RMSE <- data.frame("X"=   ldply(spmod, function(x)
+                           rmse(sppred(x, condset= "X"), x))$V1,
+              "XW"=  ldply(spmod, function(x)
+                           rmse(sppred(x, condset= "XW"), x))$V1,
+              "KP1"= ldply(spmod, function(x) rmse(sppred(x), x))$V1,
+              "XWy"= ldply(spmod, function(x)
+                           rmse(sppred(x, condset= "XWy"), x))$V1,
+              "LSP"= ldply(spmod, function(x)
+                           rmse(sppred(x, blup= "LSP", loo= TRUE), x))$V1,
+              "KP2"= ldply(spmod, function(x)
+                           rmse(sppred(x, blup= "KP2", loo= TRUE), x))$V1,
+              "KP3"= ldply(spmod, function(x)
+                           rmse(sppred(x, blup= "KP3", loo= TRUE), x))$V1)
+row.names(RMSE) <- names(spmod) ; round(RMSE, 4)
 #+end_src
 
-*** BLUP predictors
+#+ATTR_LaTeX: :placement [htb]\small
+#+Caption: The RMSE from IS sample for the 6 spatial models and 7 predictors
+#+RESULTS:
+|     |      X |     XW |    KP1 |    XWy |    LSP |    KP2 |    KP3 |
+|-----+--------+--------+--------+--------+--------+--------+--------|
+| sem | 0.2124 | 0.2124 | 0.2124 | 0.1449 |  0.137 |  0.185 | 0.2015 |
+| sxm | 0.9832 | 0.1661 | 0.1661 | 0.1292 | 0.1221 | 0.1464 | 0.1539 |
+| sar | 1.3541 | 1.3541 | 0.1846 | 0.1504 | 0.1409 | 0.1423 | 0.1119 |
+| sdm | 1.5871 | 1.5536 | 0.1627 | 0.1306 | 0.1231 |  0.128 | 0.1127 |
+| sac |  0.941 |  0.941 | 0.1899 | 0.3152 | 0.1373 |  0.327 |  0.302 |
+| smc | 1.9819 |  0.692 |   0.17 | 0.4797 | 0.1208 | 0.4632 | 0.4714 |
 
-#+begin_src R :results output exemple
-source("sppred.R")
-rmse <- function(prd, mod) sqrt(mean(I(prd- mod$y)^2))
+   The results are intriguing, the fact that KP3 does not always
+   perform best is fuzzy.
 
-semLSP <- sppred(sem, blup= "LSP", loo= TRUE)
-rmse(semLSP, sem)
-semKP2 <- sppred(sem, blup= "KP2", loo= TRUE, power= TRUE)
-rmse(semKP2, sem)
-semKP3 <- sppred(sem, blup= "KP3", loo= TRUE, power= TRUE)
-rmse(semKP3, sem)
-
-sarLSP <- sppred(sar, blup= "LSP", loo= TRUE)
-rmse(sarLSP, sar)
-sarKP2 <- sppred(sar, blup= "KP2", loo= TRUE, power= TRUE)
-rmse(sarKP2, sar)
-sarKP3 <- sppred(sar, blup= "KP3", loo= TRUE, power= TRUE)
-rmse(sarKP3, sar)
-
-
-sdmLSP <- sppred(sdm, blup= "LSP", loo= TRUE)
-rmse(sdmLSP, sem)
-sdmKP2 <- sppred(sdm, blup= "KP2", loo= TRUE, power= TRUE)
-rmse(sdmKP2, sem)
-sdmKP3 <- sppred(sdm, blup= "KP3", loo= TRUE, power= TRUE)
-rmse(sdmKP3, sem)
-
-
-
-sxmLSP <- sppred(sxm, blup= "LSP", loo= TRUE)
-sarLSP <- sppred(sar, blup= "LSP", loo= TRUE)
-sdmLSP <- sppred(sdm, blup= "LSP", loo= TRUE)
-sacLSP <- sppred(sac, blup= "LSP", loo= TRUE)
-smcLSP <- sppred(smc, blup= "LSP", loo= TRUE)
-
-; rmse(sxmLSP, sxm) ; rmse(sarLSP, sar)
-rmse(sdmLSP, sdm) ; rmse(sacLSP, sac) ; rmse(smcLSP, smc)
-
-
-semKP2 <- sppred(sem, blup= "KP2", loo= TRUE)
-sxmKP2 <- sppred(sxm, blup= "KP2", loo= TRUE)
-sarKP2 <- sppred(sar, blup= "KP2", loo= TRUE)
-sdmKP2 <- sppred(sdm, blup= "KP2", loo= TRUE)
-sacKP2 <- sppred(sac, blup= "KP2", loo= TRUE)
-smcKP2 <- sppred(smc, blup= "KP2", loo= TRUE)
-rmse(semKP2, sem) ; rmse(sxmKP2, sxm) ; rmse(sarKP2, sar)
-rmse(sdmKP2, sdm) ; rmse(sacKP2, sac) ; rmse(smcKP2, smc)
-
-semKP3 <- sppred(sem, blup= "KP3", loo= TRUE, power= TRUE)
-sxmKP3 <- sppred(sxm, blup= "KP3", loo= TRUE, power= TRUE)
-sarKP3 <- sppred(sar, blup= "KP3", loo= TRUE, power= TRUE)
-sdmKP3 <- sppred(sdm, blup= "KP3", loo= TRUE, power= TRUE)
-sacKP3 <- sppred(sac, blup= "KP3", loo= TRUE, power= TRUE)
-smcKP3 <- sppred(smc, blup= "KP3", loo= TRUE, power= TRUE)
-rmse(semKP3, sem) ; rmse(sxmKP3, sxm) ; rmse(sarKP3, sar)
-rmse(sdmKP3, sdm) ; rmse(sacKP3, sac) ; rmse(smcKP3, smc)
-
-yop <- sdmKP3- sdmXWy
-yap <- sdmLSP- sdmKP1
-
-
-#+end_src
-
+** Recovering impact measures
+** Recovering trend and signal terms
 * Testing							   :noexport:
 ** Sample
 
@@ -821,15 +728,17 @@ SAC <- sacsarlm(  ARlog03~ PXLB03+ RTFO03+ BdAlti, data= exsmp$Dat.cal,
                   exsmp$Wgt.cal, method= "eigen")
 SMC <- sacsarlm(  ARlog03~ PXLB03+ RTFO03+ BdAlti, data= exsmp$Dat.cal,
                   exsmp$Wgt.cal, method= "eigen", type= "sacmixed")
-library(plyr)
-t(ldply(list(SEM, SXM, SAR, SDM, SAC, SMC), AIC))
+SPMOD <- list(SEM= SEM, SXM= SXM, SAR= SAR, SDM= SDM, SAC= SAC, SMC= SMC)
+rbind(lapply(spmod, AIC))
 #+end_src
 
 #+RESULTS:
-:        [,1]     [,2]     [,3]     [,4]     [,5]    [,6]
-: V1 445.7127 433.3333 435.5886 434.1438 436.3016 435.197
+:      sem       sxm       sar       sdm       sac       smc      
+: [1,] -132.4525 -164.1509 -139.7872 -163.6526 -142.8058 -163.1881
 
 ** Constructing spatial weight matrix
+
+   En friche
 
 #+begin_src R :results output exemple
 str(exsmp$Dat.cal)
@@ -1067,6 +976,35 @@ plot(yop, SMCprdKP3)
 ## ON PEUT COMMENCER A METTRE DU yobs choisit
 #+end_src
 
+** Proof of Harville's simplification
+
+   To be implemented we need to be in the case of ex-sample
+   prediction. Hopefully, our data.frame allows that.
+
+#+begin_src R :results output exemple
+load("Data/exsmp.Rda") ; library(spdep)
+WCAL <- listw2mat(exsmp$Wgt.cal) ; WALL <- listw2mat(exsmp$Wgt.all)
+CAL <- row.names(exsmp$Dat.all) %in% row.names(exsmp$Dat.cal)
+## BIZARRE: yop <- WALL[CAL, CAL] != WCAL
+## ON N'UTILISE QUE WALL DE TOUTE FACON
+## METHODE PAR LA COVARIANCE
+Z <- (diag(dim(WALL)[ 1])- (.33* WALL))
+OMG <- solve(Z) %*% solve(t(Z)) # isSymmetric(OMG) TRUE
+OMG11 <- OMG[ CAL,  CAL] ; OMG22 <- OMG[!CAL, !CAL]
+OMG12 <- OMG[ CAL, !CAL] ; OMG21 <- OMG[!CAL,  CAL]
+BLUP1 <- OMG21 %*% solve(OMG11)
+BLUP1[1: 10, 1: 10]
+## METHODE PAR LA MATRICE DE PRECISION
+PHI <- t(Z) %*% Z # isSymmetric(PHI) TRUE
+PHI11 <- PHI[ CAL,  CAL] ; PHI22 <- PHI[!CAL, !CAL]
+PHI12 <- PHI[ CAL, !CAL] ; PHI21 <- PHI[!CAL,  CAL]
+BLUP2 <- - solve(PHI22) %*% PHI21
+BLUP2[1: 10, 1: 10]
+#+end_src
+
+   It is OK. It stay the question about using the computing capacity
+   of =spdep= in this framework.
+
 * Summary
 ** Changes relative to =predict.sarlm=
 
@@ -1088,6 +1026,92 @@ plot(yop, SMCprdKP3)
 * Bibliography							  :noheading:
 
 #+BIBLIOGRAPHY: BibPrd erae2 limit:t option:-nokeys option:-nofooter
+#+LaTeX: \appendix
+
+* Appendix
+** Subset function for =nb= objects
+
+   The following function =nbsubset= is a first step to decompose the
+   spatial weight matrix, in order to compute ex-sample predictions.
+   Based on the function =subset.nb= from the package =spdep=, the
+   =subset= argument is replaced by two new arguments: =focal= and
+   =target=.  In raw matrix terms, =focal= corresponds to rows and
+   =target= corresponds to columns.  As =subset=, these arguments have
+   to be logical vector of the same size that the =nb= object.  Note
+   that we can recover the same =nb= relations from the =subset.nb= by
+   putting the same logical vector both for =focal= and =target=. See
+   XX for an example of use.
+
+#+begin_src R :tangle ./spsubset.R
+nbsubset <- function (x, focal= rep(TRUE, length(x)),
+                      target= rep(TRUE, length(x)), ...){
+    if (!inherits(x, "nb")) 
+        stop("not a neighbours list")
+    if (!is.logical(focal)) 
+        stop("subset not a logical vector")
+    if (!is.logical(target)) 
+        stop("target not a logical vector")
+    n <- length(x)
+    if (n != length(focal)) 
+        stop("neighours list and subset focal different lengths")
+    if (n != length(target)) 
+        stop("neighours list and subset target different lengths")
+    tgt.ids <- seq(1, n)[ target]
+    x <- sym.attr.nb(x)
+    xattrs <- names(attributes(x))
+    z <- ifelse(focal, x, 0L)
+    for (i in seq(along= 1: n)[ focal]){
+        zi <- z[[ i]]
+        zn <- zi[zi %in% tgt.ids]
+        if (length(zn)== 0) z[[ i]] <- 0L
+        else z[[ i]] <- sort(unique(zn))
+    }
+    attr(z, "region.id") <-attr(x, "region.id")
+    for (i in 1:length(xattrs)) {
+        if (xattrs[i] != "region.id") 
+            attr(z, xattrs[i]) <- attr(x, xattrs[i])
+    }
+    z <- sym.attr.nb(z)
+    z
+}
+#+end_src
+
+** << SFL>> Subset function for =listw= objects
+
+   Below the =lwsubset= function, that is the symmetric of previous
+   =nbsubset= function for the =listw= objects. The code is not
+   finished because of the function =nb2listw= that cannot admits
+   units without neighbors and the presence of rectangular =nb=
+   relationships from =nbsubset=.
+
+#+begin_src R :tangle ./spsubset.R
+lwsubset <- function (x, focal= rep(TRUE, length(x)),
+                      target= rep(TRUE, length(x)), zero.policy = NULL, ...){
+    if (!inherits(x, "listw")) 
+        stop("not a weights list")
+    if (is.null(zero.policy)) 
+        zero.policy <- get("zeroPolicy", envir = .spdepOptions)
+    stopifnot(is.logical(zero.policy))
+    if (!is.logical(focal)) 
+        stop("focal not a logical vector")
+    if (!is.logical(target)) 
+        stop("target not a logical vector")
+    nb <- x$neighbours
+    vlist <- x$weights
+    if (attr(vlist, "mode") != "binary") 
+        stop("Not yet able to subset general weights lists")
+    style <- x$style
+    n <- length(nb)
+    if (n != length(focal)) 
+        stop("neighbours list and focal vector different lengths")
+    if (n != length(target)) 
+        stop("neighbours list and target vector different lengths")
+    subnb <- nbsubset(nb, focal, target)
+    sublistw <- nb2listw(neighbours= subnb, glist= NULL,
+                         style= style, zero.policy= zero.policy)
+    sublistw
+}
+#+end_src
 
 * Footnotes
 
@@ -1102,5 +1126,6 @@ plot(yop, SMCprdKP3)
   values for units with known $y$ for diagnostic, goodness-of-fit
   purposes or computations of marginal effects of covariates.
 
+[fn:3] Does the geo-statistical literature is concerned with marginal
+  effects of covariates? Somme papers?
 
-# apalike

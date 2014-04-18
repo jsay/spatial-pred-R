@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Extending Predictions from Spatial Econometric Models on R</title>
-<!-- 2014-04-17 jeu. 20:33 -->
+<!-- 2014-04-18 ven. 15:54 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Jean-Sauveur AY \\ \lt[[mailto:jsay.site@gmail.com][jsay.site@gmail.com]]jsay.site@gmail.com\gt \and Raja CHAKIR\\ \lt[[mailto:chakir@grignon.inra.fr][chakir@grignon.inra.fr]]chakir@grignon.inra.fr\gt\\ \and Julie LE GALLO\\ \lt[[mailto:jlegallo@univ-fcomte.fr][jlegallo@univ-fcomte.fr]]jlegallo@univ-fcomte.fr\gt" />
@@ -261,7 +261,7 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-1-1">1.1. Spatial econometric models</a></li>
 <li><a href="#sec-1-2">1.2. Implementing predictions</a></li>
-<li><a href="#sec-1-3">1.3. A taxonomy of spatial predictions</a></li>
+<li><a href="#sec-1-3">1.3. A taxonomy of spatial sample schemes</a></li>
 </ul>
 </li>
 <li><a href="#sec-2">2. Current function from <code>spdep</code></a></li>
@@ -295,20 +295,24 @@ for the JavaScript code in this tag.
 </li>
 <li><a href="#sec-5">5. The <code>boston</code> example</a>
 <ul>
-<li><a href="#sec-5-1">5.1. Subset the dataset</a></li>
-<li><a href="#sec-5-2">5.2. Estimating the models</a></li>
-<li><a href="#sec-5-3">5.3. Predicting</a>
-<ul>
-<li><a href="#sec-5-3-1">5.3.1. Inefficient predictors</a></li>
-<li><a href="#sec-5-3-2">5.3.2. BLUP predictors</a></li>
-</ul>
-</li>
+<li><a href="#sec-5-1">5.1. The spatial samples</a></li>
+<li><a href="#sec-5-2">5.2. Neighborhood relationships</a></li>
+<li><a href="#sec-5-3">5.3. Estimating the models</a></li>
+<li><a href="#sec-5-4">5.4. Predicting for in-sample</a></li>
+<li><a href="#sec-5-5">5.5. Recovering impact measures</a></li>
+<li><a href="#sec-5-6">5.6. Recovering trend and signal terms</a></li>
 </ul>
 </li>
 <li><a href="#sec-6">6. Summary</a>
 <ul>
 <li><a href="#sec-6-1">6.1. Changes relative to <code>predict.sarlm</code></a></li>
 <li><a href="#sec-6-2">6.2. About the intercept</a></li>
+</ul>
+</li>
+<li><a href="#sec-7">7. Appendix</a>
+<ul>
+<li><a href="#sec-7-1">7.1. Subset function for <code>nb</code> objects</a></li>
+<li><a href="#sec-7-2">7.2. Subset function for <code>listw</code> objects</a></li>
 </ul>
 </li>
 </ul>
@@ -353,6 +357,7 @@ welcome.<br  />
 <li><a href="#sec-4">4. How it works</a></li>
 <li><a href="#sec-5">5. The <code>boston</code> example</a></li>
 <li><a href="#sec-6">6. Summary</a></li>
+<li><a href="#sec-7">7. Appendix</a></li>
 </ul>
 </div>
 </div>
@@ -453,13 +458,15 @@ but an approximation.
 </p>
 
 <p>
-Finally, note that geo-statistical models (Cressie 1990) usually
+Finally, note that geo-statistical models (typically from the
+kriging methods, [<a href="#CCas93">CCas93</a>]) are aware about the need for using
+BLUP predictors. Relatively to spatial econometric approaches, they
 involve specifying spatial dependence through the error process
-(like in SEM or SXM) as opposed to the spatial lag of the outcome
-vector (like in SAR or SDM). Predicting from these error models
-take a simpler form than autoregressive models and can be easily
+(like in spatial error models, see below) as opposed to the spatial
+lag of the outcome vector. Predicting from these error models take
+a simpler form than autoregressive models and can be easily
 recovered from the theoretical framework presented here. The
-reverse is not true.
+reverse is not true.<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup>
 </p>
 </div>
 </div>
@@ -472,7 +479,7 @@ to predict the values of the outcome \(y\).  These units may or may
 not be included in the dataset used for the estimation of the
 parameters. At this moment, it makes no differences and we
 distinguish them only in the research interest of obtaining
-predictions of \(y\).<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup>  We discuss this point in more details at the
+predictions of \(y\).<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup>  We discuss this point in more details at the
 next subsection XX.
 </p>
 
@@ -546,6 +553,16 @@ predictions individually of each OS units indexed \(i\).
 This simplification comes from&#x2026;
 </p>
 
+<p>
+Note that this predictor is not consistent in terms of expectation
+conditioned by a unique information set. In effect, the
+non-stochastic part is conditioned without the knowledge of the
+outcome variable, which is nevertheless necessary to compute the
+BLUP correction of the stochastic part. This misleading appears
+because of the writing of the reduced form before taking the
+conditional expectation.
+</p>
+
 \begin{equation}
 \tag{prdKP2}\mathbf{E}(y_i\mid X, W, y_{IS})= \rho Wy+ X\widehat{\beta}+ WX\widehat{\theta} 
                                             +  \Omega_{21}\Omega_{11}^{-1}(y_{IS}-\mathbf{E}(y_{IS}\mid X, W))
@@ -593,7 +610,7 @@ segregative case, this corresponds to a ex-sample case.
 </div>
 </div>
 <div id="outline-container-sec-1-3" class="outline-3">
-<h3 id="sec-1-3"><span class="section-number-3">1.3</span> A taxonomy of spatial predictions</h3>
+<h3 id="sec-1-3"><span class="section-number-3">1.3</span> A taxonomy of spatial sample schemes</h3>
 <div class="outline-text-3" id="text-1-3">
 <p>
 In spatial econometrics, the usual distinction between in-sample
@@ -1004,69 +1021,152 @@ powerWeigths?
 <h2 id="sec-5"><span class="section-number-2">5</span> The <code>boston</code> example</h2>
 <div class="outline-text-2" id="text-5">
 </div><div id="outline-container-sec-5-1" class="outline-3">
-<h3 id="sec-5-1"><span class="section-number-3">5.1</span> Subset the dataset</h3>
+<h3 id="sec-5-1"><span class="section-number-3">5.1</span> The spatial samples</h3>
 <div class="outline-text-3" id="text-5-1">
 <p>
-and plot nb matrix
+We use here the <code>boston</code> dataset, available from the <code>spdep</code>
+package (Bivand 2014). It consists in XX. From the whole sample, we
+draw randomly 211 observations from 250 drawn of a uniform
+distribution and dropping duplicated units. This allows to
+distinguish two sample: IS and OS.
 </p>
 
 <div class="org-src-container">
 
-<pre class="src src-R" id="Lst:SWB"><span style="color: #4c83ff;">library</span>(spdep) ; data(boston) ; <span style="color: #4c83ff;">library</span>(rgdal)
-bst.sp <span style="color: #4c83ff;">&lt;-</span> readOGR(system.file(<span style="color: #61CE3C;">"etc/shapes"</span>, package= <span style="color: #61CE3C;">"spdep"</span>),
-                  <span style="color: #61CE3C;">"boston_tracts"</span>, verbose= <span style="color: #D8FA3C;">FALSE</span>)
+<pre class="src src-R"><span style="color: #4c83ff;">library</span>(spdep) ; data(boston) ; <span style="color: #4c83ff;">library</span>(rgdal)
+bst.sp <span style="color: #4c83ff;">&lt;-</span> readOGR(system.file(<span style="color: #61CE3C;">"etc/shapes"</span>, package= <span style="color: #61CE3C;">"spdep"</span>), <span style="color: #61CE3C;">"boston_tracts"</span>)
+set.seed(84) ; cal <span style="color: #4c83ff;">&lt;-</span> unique(round(runif(250)* 500))
+bst.sp$SMP <span style="color: #4c83ff;">&lt;-</span> <span style="color: #61CE3C;">"OS"</span> ; bst.sp$SMP[cal] <span style="color: #4c83ff;">&lt;-</span> <span style="color: #61CE3C;">"IS"</span>
+ins.sp <span style="color: #4c83ff;">&lt;-</span> subset(bst.sp, bst.sp$SMP== <span style="color: #61CE3C;">"IS"</span>)
+ots.sp <span style="color: #4c83ff;">&lt;-</span> subset(bst.sp, bst.sp$SMP== <span style="color: #61CE3C;">"OS"</span>)
+cbind(<span style="color: #61CE3C;">"ALL"</span>= dim(bst.sp), <span style="color: #61CE3C;">"IN SMP"</span>= dim(ins.sp), <span style="color: #61CE3C;">"OUT SMP"</span>= dim(ots.sp))
+</pre>
+</div>
+
+<pre class="example">
+OGR data source with driver: ESRI Shapefile 
+Source: "/home/jsay/R/x86_64-pc-linux-gnu-library/3.0/spdep/etc/shapes", layer: "boston_tracts"
+with 506 features and 21 fields
+Feature type: wkbPolygon with 2 dimensions
+     ALL IN-SMP OUT-SMP
+[1,] 506    211     295
+[2,]  22     22      22
+</pre>
+
+<p>
+Spatial units without neighbors are kept in these spatial
+data.frames.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2"><span class="section-number-3">5.2</span> Neighborhood relationships</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+The following code use the function <code>nbsubset</code> described in
+Appendix XX and tangled in the file <code>spsubset.R</code>. As it is shown by
+the following Figure XX, this function allows to compute the <code>nb</code>
+equivalent to the spatial weight matrix \(W_I\), \(W_O\), \(W_{IO}\) and
+\(W_{OI}\). The logic behind <code>nbsubset</code> is rather different than the
+classical <code>subset.nb</code> function because some absent units have to be
+referred by present units. So we do not change the dimension of the
+<code>nb</code> matrix, we put some 0 instead but this leads to some problems
+to compute the spatial weights after (see the commentaries in
+Appendix <a href="#SFL">7.2</a>).
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-R" id="Lst:SWB"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"spsubset.R"</span>)
 bst.nb <span style="color: #4c83ff;">&lt;-</span> poly2nb(bst.sp) ; bst.lw <span style="color: #4c83ff;">&lt;-</span> nb2listw(bst.nb)
-set.seed(85) 
-tst.sp <span style="color: #4c83ff;">&lt;-</span> bst.sp[cal <span style="color: #4c83ff;">&lt;-</span> unique(round(runif(250)* 500)), ]
-tst.nb <span style="color: #4c83ff;">&lt;-</span> poly2nb(tst.sp) ; ins.sp <span style="color: #4c83ff;">&lt;-</span> subset(tst.sp, card(tst.nb)!= 0)
-ins.nb <span style="color: #4c83ff;">&lt;-</span> poly2nb(ins.sp) ; ins.lw <span style="color: #4c83ff;">&lt;-</span> nb2listw(ins.nb)
-tst.sp <span style="color: #4c83ff;">&lt;-</span> subset(bst.sp,
-                 !bst.sp$poltract %<span style="color: #FBDE2D;">in</span>% levels(factor(ins.sp$poltract)))
-tst.nb <span style="color: #4c83ff;">&lt;-</span> poly2nb(tst.sp) ; ots.sp <span style="color: #4c83ff;">&lt;-</span> subset(tst.sp, card(tst.nb)!= 0)
-ots.nb <span style="color: #4c83ff;">&lt;-</span> poly2nb(ots.sp) ; ots.lw <span style="color: #4c83ff;">&lt;-</span> nb2listw(ots.nb)
-bst <span style="color: #4c83ff;">&lt;-</span> data.frame(A= rep(row.names(bst.sp), card(bst.nb)), B= unlist(bst.nb))
-ins <span style="color: #4c83ff;">&lt;-</span> data.frame(A= rep(row.names(ins.sp), card(ins.nb)), B= unlist(ins.nb))
-ots <span style="color: #4c83ff;">&lt;-</span> data.frame(A= rep(row.names(ots.sp), card(ots.nb)), B= unlist(ots.nb))
-ins$ins <span style="color: #4c83ff;">&lt;-</span> 1 ; ots$ots <span style="color: #4c83ff;">&lt;-</span> 1
-yop <span style="color: #4c83ff;">&lt;-</span> data.frame(merge(bst, ins, by= c(<span style="color: #61CE3C;">"A"</span>, <span style="color: #61CE3C;">"B"</span>), all.x= <span style="color: #D8FA3C;">TRUE</span>),
-                  <span style="color: #61CE3C;">"ots"</span>= merge(bst, ots, by= c(<span style="color: #61CE3C;">"A"</span>, <span style="color: #61CE3C;">"B"</span>), all.x= <span style="color: #D8FA3C;">TRUE</span>)[, 3])
-par(mar= c(0, 0, 0, 0)) ; plot(bst.sp)
-plot(ins.sp, col= <span style="color: #61CE3C;">"grey30"</span>, add= <span style="color: #D8FA3C;">TRUE</span>)
-plot(ots.sp, col= <span style="color: #61CE3C;">"grey70"</span>, add= <span style="color: #D8FA3C;">TRUE</span>)
-plot(bst.nb, coordinates(bst.sp), add= <span style="color: #D8FA3C;">TRUE</span>, col= <span style="color: #61CE3C;">"red"</span>)
-plot(ins.nb, coordinates(ins.sp), add= <span style="color: #D8FA3C;">TRUE</span>, col= <span style="color: #61CE3C;">"blue"</span>)
-plot(ots.nb, coordinates(ots.sp), add= <span style="color: #D8FA3C;">TRUE</span>, col= <span style="color: #61CE3C;">"green"</span>)
+WII <span style="color: #4c83ff;">&lt;-</span> nbsubset(bst.nb, bst.sp$SMP== <span style="color: #61CE3C;">"IS"</span>, target= bst.sp$SMP== <span style="color: #61CE3C;">"IS"</span>)
+WIO <span style="color: #4c83ff;">&lt;-</span> nbsubset(bst.nb, bst.sp$SMP== <span style="color: #61CE3C;">"IS"</span>, target= bst.sp$SMP== <span style="color: #61CE3C;">"OS"</span>)
+WOI <span style="color: #4c83ff;">&lt;-</span> nbsubset(bst.nb, bst.sp$SMP== <span style="color: #61CE3C;">"OS"</span>, target= bst.sp$SMP== <span style="color: #61CE3C;">"IS"</span>)
+WOO <span style="color: #4c83ff;">&lt;-</span> nbsubset(bst.nb, bst.sp$SMP== <span style="color: #61CE3C;">"OS"</span>, target= bst.sp$SMP== <span style="color: #61CE3C;">"OS"</span>)
+par(mar= c(0, 0, 0, 0)) ; plot(bst.sp, lwd= 5)
+plot(ots.sp, col= <span style="color: #61CE3C;">"grey70"</span>, add= <span style="color: #D8FA3C;">TRUE</span>, border= <span style="color: #D8FA3C;">FALSE</span>)
+plot(ins.sp, col= <span style="color: #61CE3C;">"grey30"</span>, add= <span style="color: #D8FA3C;">TRUE</span>, border= <span style="color: #D8FA3C;">FALSE</span>)
+plot(bst.nb, coordinates(bst.sp), add= T, col= <span style="color: #61CE3C;">"black"</span> , pch= 20, cex= .2)
+plot(WII, coordinates(bst.sp), add= T, col= <span style="color: #61CE3C;">"green"</span>, pch= 20, cex= .2)
+plot(WIO, coordinates(bst.sp), add= T, col= <span style="color: #61CE3C;">"blue"</span> , pch= 20, cex= .2)
+plot(WOO, coordinates(bst.sp), add= T, col= <span style="color: #61CE3C;">"red"</span>  , pch= 20, cex= .2)
+legend(<span style="color: #61CE3C;">"topleft"</span>, col= c(<span style="color: #61CE3C;">"blue"</span>, <span style="color: #61CE3C;">"green"</span>, <span style="color: #61CE3C;">"red"</span>), lwd= 1.5,
+       c(<span style="color: #61CE3C;">"PRD NBH"</span>, <span style="color: #61CE3C;">"IS NBH"</span>, <span style="color: #61CE3C;">"OS NBH"</span>), bty= <span style="color: #61CE3C;">"n"</span>, cex= 1.25)
+legend(<span style="color: #61CE3C;">"right"</span>, fill= c(<span style="color: #61CE3C;">"grey30"</span>, <span style="color: #61CE3C;">"grey70"</span>),
+       c(<span style="color: #61CE3C;">"IN-SAMPLE"</span>, <span style="color: #61CE3C;">"OUT-OF-SAMPLE"</span>), bty= <span style="color: #61CE3C;">"n"</span>, cex= 1.25)
 </pre>
 </div>
 
 <p>
 <a href="Figures/SpWeigthBoston.pdf">Figures/SpWeigthBoston.pdf</a>
 </p>
+
+<p>
+From a first order neighboring point of view, the symmetry of the
+matrix produce a clear distinction between the spatial
+relationships. They are identified through different colors
+according to&#x2026; The green links are of central interest for
+information transmission between units. Be careful about the island
+that present yellow links (see at the bottom right).
+</p>
+
+<p>
+LES ILOTS "IS" NE PEUVENT PAS ETRE UTILISES POUR ESTIMER LE MODELE
+MAIS PEUVENT ETRE UTILE POUR PREDIRE
+</p>
+
+<p>
+Il ne faut pas que je change les id et donc la dimension il faut
+simplement mettre de zéro? Et ensuite à partir d'autres subsets sur
+cette matrice on devrait obtenir la bonne dimension. Dans cette
+deuxième étape on devrait alors enlever les ilots.
+</p>
+
+<p>
+Une autre possibilité serait de spécifier la matrice avec tout le
+monde, la traduire en W et sélectionner les lignes et les colonnes
+qui nous intéressent.
+</p>
 </div>
 </div>
-<div id="outline-container-sec-5-2" class="outline-3">
-<h3 id="sec-5-2"><span class="section-number-3">5.2</span> Estimating the models</h3>
-<div class="outline-text-3" id="text-5-2">
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3"><span class="section-number-3">5.3</span> Estimating the models</h3>
+<div class="outline-text-3" id="text-5-3">
+<p>
+We estimate on the IS sample the 6 spatial econometric models from
+the <code>spdep</code> package, with the classical specification presented in
+Bivand (2002). Before the estimation (and to be OK with the
+computation of spatial weights) we have to drop some units without
+neighbors with the help of the <code>card</code> function.
+</p>
+
 <div class="org-src-container">
 
-<pre class="src src-R">eqn.bst <span style="color: #4c83ff;">&lt;-</span> log(CMEDV)~ CRIM    + ZN + INDUS   + CHAS    + I(NOX^2)+
+<pre class="src src-R"><span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">DROP OUT THE UNITS WITHOUT NEIGHBORS</span>
+ins.lw <span style="color: #4c83ff;">&lt;-</span> subset(bst.lw, card(WII)!= 0) 
+inz.sp <span style="color: #4c83ff;">&lt;-</span> subset(bst.sp, card(WII)!= 0)
+<span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">DEFINE THE MODEL SPECIFICATION</span>
+eqn.bst <span style="color: #4c83ff;">&lt;-</span> log(CMEDV)~ CRIM    + ZN + INDUS   + CHAS    + I(NOX^2)+
                        I(RM^2) + AGE+ log(DIS)+ log(RAD)+ TAX     +
                        PTRATIO + B  + log(LSTAT)
-sem <span style="color: #4c83ff;">&lt;-</span> errorsarlm(eqn.bst, data= ins.sp, ins.lw, method= <span style="color: #61CE3C;">"Matrix"</span>)
-sxm <span style="color: #4c83ff;">&lt;-</span> errorsarlm(eqn.bst, data= ins.sp,
+<span style="color: #8B8989; font-style: italic;">## </span><span style="color: #8B8989; font-style: italic;">ESTIMATE THE MODELS AND REPORT THE AICs</span>
+sem <span style="color: #4c83ff;">&lt;-</span> errorsarlm(eqn.bst, data= inz.sp, ins.lw, method= <span style="color: #61CE3C;">"Matrix"</span>)
+sxm <span style="color: #4c83ff;">&lt;-</span> errorsarlm(eqn.bst, data= inz.sp,
                   ins.lw, etype= <span style="color: #61CE3C;">"emixed"</span>   , method= <span style="color: #61CE3C;">"Matrix"</span>)
-sar <span style="color: #4c83ff;">&lt;-</span> lagsarlm(  eqn.bst, data= ins.sp, ins.lw, method= <span style="color: #61CE3C;">"Matrix"</span>)
-sdm <span style="color: #4c83ff;">&lt;-</span> lagsarlm(  eqn.bst, data= ins.sp,
+sar <span style="color: #4c83ff;">&lt;-</span> lagsarlm(  eqn.bst, data= inz.sp, ins.lw, method= <span style="color: #61CE3C;">"Matrix"</span>)
+sdm <span style="color: #4c83ff;">&lt;-</span> lagsarlm(  eqn.bst, data= inz.sp,
                   ins.lw,  type= <span style="color: #61CE3C;">"mixed"</span>    , method= <span style="color: #61CE3C;">"Matrix"</span>)
-sac <span style="color: #4c83ff;">&lt;-</span> sacsarlm(  eqn.bst, data= ins.sp, ins.lw, method= <span style="color: #61CE3C;">"Matrix"</span>)
-smc <span style="color: #4c83ff;">&lt;-</span> sacsarlm(  eqn.bst, data= ins.sp,
+sac <span style="color: #4c83ff;">&lt;-</span> sacsarlm(  eqn.bst, data= inz.sp, ins.lw, method= <span style="color: #61CE3C;">"Matrix"</span>)
+smc <span style="color: #4c83ff;">&lt;-</span> sacsarlm(  eqn.bst, data= inz.sp,
                   ins.lw,  type= <span style="color: #61CE3C;">"sacmixed"</span> , method= <span style="color: #61CE3C;">"Matrix"</span>)
-AIC(sem, sxm, sar, sdm, sac, smc)[, 2]
+spmod <span style="color: #4c83ff;">&lt;-</span> list(sem= sem, sxm= sxm, sar= sar, sdm= sdm, sac= sac, smc= smc)
+data.frame(lapply(spmod, AIC))
 </pre>
 </div>
 
 <pre class="example">
-[1] -150.6177 -137.7367 -143.6867 -138.6026 -148.6190 -155.1596
+        sem       sxm       sar       sdm       sac       smc
+1 -132.4525 -164.1509 -139.7872 -163.6526 -142.8058 -163.1881
 </pre>
 
 <p>
@@ -1074,119 +1174,150 @@ The SXM is the more parsimonious in terms of AC
 </p>
 </div>
 </div>
-<div id="outline-container-sec-5-3" class="outline-3">
-<h3 id="sec-5-3"><span class="section-number-3">5.3</span> Predicting</h3>
-<div class="outline-text-3" id="text-5-3">
-</div><div id="outline-container-sec-5-3-1" class="outline-4">
-<h4 id="sec-5-3-1"><span class="section-number-4">5.3.1</span> Inefficient predictors</h4>
-<div class="outline-text-4" id="text-5-3-1">
+<div id="outline-container-sec-5-4" class="outline-3">
+<h3 id="sec-5-4"><span class="section-number-3">5.4</span> Predicting for in-sample</h3>
+<div class="outline-text-3" id="text-5-4">
+<p>
+We next compute the RMSE for each model \(\times\) predictor
+combination.
+</p>
+
 <div class="org-src-container">
 
-<pre class="src src-R"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"sppred.R"</span>)
+<pre class="src src-R"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"sppred.R"</span>) ; <span style="color: #4c83ff;">library</span>(plyr)
 <span style="color: #ff1493;">rmse</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(prd, mod) sqrt(mean(I(prd- mod$y)^2))
-semKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(sem) ; sxmKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(sxm) ; sarKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(sar)
-sdmKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(sdm) ; sacKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(sac) ; smcKP1 <span style="color: #4c83ff;">&lt;-</span> sppred(smc)
-rmse(semKP1, sem) ; rmse(sxmKP1, sxm) ; rmse(sarKP1, sar)
-rmse(sdmKP1, sdm) ; rmse(sacKP1, sac) ; rmse(smcKP1, smc)
-
-semX <span style="color: #4c83ff;">&lt;-</span> sppred(sem, condset= <span style="color: #61CE3C;">"X"</span>)
-sxmX <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, condset= <span style="color: #61CE3C;">"X"</span>)
-sarX <span style="color: #4c83ff;">&lt;-</span> sppred(sar, condset= <span style="color: #61CE3C;">"X"</span>)
-sdmX <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, condset= <span style="color: #61CE3C;">"X"</span>)
-sacX <span style="color: #4c83ff;">&lt;-</span> sppred(sac, condset= <span style="color: #61CE3C;">"X"</span>)
-smcX <span style="color: #4c83ff;">&lt;-</span> sppred(smc, condset= <span style="color: #61CE3C;">"X"</span>)
-rmse(semX, sem) ; rmse(sxmX, sxm) ; rmse(sarX, sar)
-rmse(sdmX, sdm) ; rmse(sacX, sac) ; rmse(smcX, smc)
-
-semXW <span style="color: #4c83ff;">&lt;-</span> sppred(sem, condset= <span style="color: #61CE3C;">"XW"</span>)
-sxmXW <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, condset= <span style="color: #61CE3C;">"XW"</span>)
-sarXW <span style="color: #4c83ff;">&lt;-</span> sppred(sar, condset= <span style="color: #61CE3C;">"XW"</span>)
-sdmXW <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, condset= <span style="color: #61CE3C;">"XW"</span>)
-sacXW <span style="color: #4c83ff;">&lt;-</span> sppred(sac, condset= <span style="color: #61CE3C;">"XW"</span>)
-smcXW <span style="color: #4c83ff;">&lt;-</span> sppred(smc, condset= <span style="color: #61CE3C;">"XW"</span>)
-rmse(semXW, sem) ; rmse(sxmXW, sxm) ; rmse(sarXW, sar)
-rmse(sdmXW, sdm) ; rmse(sacXW, sac) ; rmse(smcXW, smc)
-
-semXWy <span style="color: #4c83ff;">&lt;-</span> sppred(sem, condset= <span style="color: #61CE3C;">"XWy"</span>)
-sxmXWy <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, condset= <span style="color: #61CE3C;">"XWy"</span>)
-sarXWy <span style="color: #4c83ff;">&lt;-</span> sppred(sar, condset= <span style="color: #61CE3C;">"XWy"</span>)
-sdmXWy <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, condset= <span style="color: #61CE3C;">"XWy"</span>)
-sacXWy <span style="color: #4c83ff;">&lt;-</span> sppred(sac, condset= <span style="color: #61CE3C;">"XWy"</span>)
-smcXWy <span style="color: #4c83ff;">&lt;-</span> sppred(smc, condset= <span style="color: #61CE3C;">"XWy"</span>)
-rmse(semXWy, sem) ; rmse(sxmXWy, sxm) ; rmse(sarXWy, sar)
-rmse(sdmXWy, sdm) ; rmse(sacXWy, sac) ; rmse(smcXWy, smc)
+RMSE <span style="color: #4c83ff;">&lt;-</span> data.frame(<span style="color: #61CE3C;">"X"</span>=   ldply(spmod, <span style="color: #FBDE2D;">function</span>(x)
+                           rmse(sppred(x, condset= <span style="color: #61CE3C;">"X"</span>), x))$V1,
+              <span style="color: #61CE3C;">"XW"</span>=  ldply(spmod, <span style="color: #FBDE2D;">function</span>(x)
+                           rmse(sppred(x, condset= <span style="color: #61CE3C;">"XW"</span>), x))$V1,
+              <span style="color: #61CE3C;">"KP1"</span>= ldply(spmod, <span style="color: #FBDE2D;">function</span>(x) rmse(sppred(x), x))$V1,
+              <span style="color: #61CE3C;">"XWy"</span>= ldply(spmod, <span style="color: #FBDE2D;">function</span>(x)
+                           rmse(sppred(x, condset= <span style="color: #61CE3C;">"XWy"</span>), x))$V1,
+              <span style="color: #61CE3C;">"LSP"</span>= ldply(spmod, <span style="color: #FBDE2D;">function</span>(x)
+                           rmse(sppred(x, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>), x))$V1,
+              <span style="color: #61CE3C;">"KP2"</span>= ldply(spmod, <span style="color: #FBDE2D;">function</span>(x)
+                           rmse(sppred(x, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>), x))$V1,
+              <span style="color: #61CE3C;">"KP3"</span>= ldply(spmod, <span style="color: #FBDE2D;">function</span>(x)
+                           rmse(sppred(x, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>), x))$V1)
+row.names(RMSE) <span style="color: #4c83ff;">&lt;-</span> names(spmod) ; round(RMSE, 4)
 </pre>
 </div>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+<caption class="t-above"><span class="table-number">Table 2:</span> The RMSE from IS sample for the 6 spatial models and 7 predictors</caption>
+
+<colgroup>
+<col  class="left" />
+
+<col  class="right" />
+
+<col  class="right" />
+
+<col  class="right" />
+
+<col  class="right" />
+
+<col  class="right" />
+
+<col  class="right" />
+
+<col  class="right" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="left">&#xa0;</th>
+<th scope="col" class="right">X</th>
+<th scope="col" class="right">XW</th>
+<th scope="col" class="right">KP1</th>
+<th scope="col" class="right">XWy</th>
+<th scope="col" class="right">LSP</th>
+<th scope="col" class="right">KP2</th>
+<th scope="col" class="right">KP3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="left">sem</td>
+<td class="right">0.2124</td>
+<td class="right">0.2124</td>
+<td class="right">0.2124</td>
+<td class="right">0.1449</td>
+<td class="right">0.137</td>
+<td class="right">0.185</td>
+<td class="right">0.2015</td>
+</tr>
+
+<tr>
+<td class="left">sxm</td>
+<td class="right">0.9832</td>
+<td class="right">0.1661</td>
+<td class="right">0.1661</td>
+<td class="right">0.1292</td>
+<td class="right">0.1221</td>
+<td class="right">0.1464</td>
+<td class="right">0.1539</td>
+</tr>
+
+<tr>
+<td class="left">sar</td>
+<td class="right">1.3541</td>
+<td class="right">1.3541</td>
+<td class="right">0.1846</td>
+<td class="right">0.1504</td>
+<td class="right">0.1409</td>
+<td class="right">0.1423</td>
+<td class="right">0.1119</td>
+</tr>
+
+<tr>
+<td class="left">sdm</td>
+<td class="right">1.5871</td>
+<td class="right">1.5536</td>
+<td class="right">0.1627</td>
+<td class="right">0.1306</td>
+<td class="right">0.1231</td>
+<td class="right">0.128</td>
+<td class="right">0.1127</td>
+</tr>
+
+<tr>
+<td class="left">sac</td>
+<td class="right">0.941</td>
+<td class="right">0.941</td>
+<td class="right">0.1899</td>
+<td class="right">0.3152</td>
+<td class="right">0.1373</td>
+<td class="right">0.327</td>
+<td class="right">0.302</td>
+</tr>
+
+<tr>
+<td class="left">smc</td>
+<td class="right">1.9819</td>
+<td class="right">0.692</td>
+<td class="right">0.17</td>
+<td class="right">0.4797</td>
+<td class="right">0.1208</td>
+<td class="right">0.4632</td>
+<td class="right">0.4714</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+The results are intriguing, the fact that KP3 does not always
+perform best is fuzzy.
+</p>
 </div>
 </div>
-<div id="outline-container-sec-5-3-2" class="outline-4">
-<h4 id="sec-5-3-2"><span class="section-number-4">5.3.2</span> BLUP predictors</h4>
-<div class="outline-text-4" id="text-5-3-2">
-<div class="org-src-container">
-
-<pre class="src src-R"><span style="color: #4c83ff;">source</span>(<span style="color: #61CE3C;">"sppred.R"</span>)
-<span style="color: #ff1493;">rmse</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span>(prd, mod) sqrt(mean(I(prd- mod$y)^2))
-
-semLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sem, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-rmse(semLSP, sem)
-semKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sem, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-rmse(semKP2, sem)
-semKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sem, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-rmse(semKP3, sem)
-
-sarLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sar, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-rmse(sarLSP, sar)
-sarKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sar, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-rmse(sarKP2, sar)
-sarKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sar, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-rmse(sarKP3, sar)
-
-
-sdmLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-rmse(sdmLSP, sem)
-sdmKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-rmse(sdmKP2, sem)
-sdmKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-rmse(sdmKP3, sem)
-
-
-
-sxmLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-sarLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sar, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-sdmLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-sacLSP <span style="color: #4c83ff;">&lt;-</span> sppred(sac, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-smcLSP <span style="color: #4c83ff;">&lt;-</span> sppred(smc, blup= <span style="color: #61CE3C;">"LSP"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-
-; rmse(sxmLSP, sxm) ; rmse(sarLSP, sar)
-rmse(sdmLSP, sdm) ; rmse(sacLSP, sac) ; rmse(smcLSP, smc)
-
-
-semKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sem, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-sxmKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-sarKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sar, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-sdmKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-sacKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(sac, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-smcKP2 <span style="color: #4c83ff;">&lt;-</span> sppred(smc, blup= <span style="color: #61CE3C;">"KP2"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>)
-rmse(semKP2, sem) ; rmse(sxmKP2, sxm) ; rmse(sarKP2, sar)
-rmse(sdmKP2, sdm) ; rmse(sacKP2, sac) ; rmse(smcKP2, smc)
-
-semKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sem, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-sxmKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sxm, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-sarKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sar, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-sdmKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sdm, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-sacKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(sac, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-smcKP3 <span style="color: #4c83ff;">&lt;-</span> sppred(smc, blup= <span style="color: #61CE3C;">"KP3"</span>, loo= <span style="color: #D8FA3C;">TRUE</span>, power= <span style="color: #D8FA3C;">TRUE</span>)
-rmse(semKP3, sem) ; rmse(sxmKP3, sxm) ; rmse(sarKP3, sar)
-rmse(sdmKP3, sdm) ; rmse(sacKP3, sac) ; rmse(smcKP3, smc)
-
-yop <span style="color: #4c83ff;">&lt;-</span> sdmKP3- sdmXWy
-yap <span style="color: #4c83ff;">&lt;-</span> sdmLSP- sdmKP1
-</pre>
+<div id="outline-container-sec-5-5" class="outline-3">
+<h3 id="sec-5-5"><span class="section-number-3">5.5</span> Recovering impact measures</h3>
+</div>
+<div id="outline-container-sec-5-6" class="outline-3">
+<h3 id="sec-5-6"><span class="section-number-3">5.6</span> Recovering trend and signal terms</h3>
 </div>
 </div>
-</div>
-</div>
-</div>
+
 <div id="outline-container-sec-6" class="outline-2">
 <h2 id="sec-6"><span class="section-number-2">6</span> Summary</h2>
 <div class="outline-text-2" id="text-6">
@@ -1249,6 +1380,114 @@ in the presence of \(WX\).
 [&nbsp;<a href="BibPrd_bib.html#COrd81">bib</a>&nbsp;]
 
 </p>
+
+<p><a name="CCas93"></a>
+
+<b>Cressie, N.&nbsp;A. and N.&nbsp;A. Cassie</b> (1993). <em>Statistics for Spatial
+  Data</em>,   <em>900</em>. Wiley New York.
+[&nbsp;<a href="BibPrd_bib.html#CCas93">bib</a>&nbsp;]
+
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7"><span class="section-number-2">7</span> Appendix</h2>
+<div class="outline-text-2" id="text-7">
+</div><div id="outline-container-sec-7-1" class="outline-3">
+<h3 id="sec-7-1"><span class="section-number-3">7.1</span> Subset function for <code>nb</code> objects</h3>
+<div class="outline-text-3" id="text-7-1">
+<p>
+The following function <code>nbsubset</code> is a first step to decompose the
+spatial weight matrix, in order to compute ex-sample predictions.
+Based on the function <code>subset.nb</code> from the package <code>spdep</code>, the
+<code>subset</code> argument is replaced by two new arguments: <code>focal</code> and
+<code>target</code>.  In raw matrix terms, <code>focal</code> corresponds to rows and
+<code>target</code> corresponds to columns.  As <code>subset</code>, these arguments have
+to be logical vector of the same size that the <code>nb</code> object.  Note
+that we can recover the same <code>nb</code> relations from the <code>subset.nb</code> by
+putting the same logical vector both for <code>focal</code> and <code>target</code>. See
+XX for an example of use.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #ff1493;">nbsubset</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span> (x, focal= rep(<span style="color: #D8FA3C;">TRUE</span>, length(x)),
+                      target= rep(<span style="color: #D8FA3C;">TRUE</span>, length(x)), ...){
+    <span style="color: #FBDE2D;">if</span> (!inherits(x, <span style="color: #61CE3C;">"nb"</span>)) 
+        <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"not a neighbours list"</span>)
+    <span style="color: #FBDE2D;">if</span> (!is.logical(focal)) 
+        <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"subset not a logical vector"</span>)
+    <span style="color: #FBDE2D;">if</span> (!is.logical(target)) 
+        <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"target not a logical vector"</span>)
+    n <span style="color: #4c83ff;">&lt;-</span> length(x)
+    <span style="color: #FBDE2D;">if</span> (n != length(focal)) 
+        <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"neighours list and subset focal different lengths"</span>)
+    <span style="color: #FBDE2D;">if</span> (n != length(target)) 
+        <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"neighours list and subset target different lengths"</span>)
+    tgt.ids <span style="color: #4c83ff;">&lt;-</span> seq(1, n)[ target]
+    x <span style="color: #4c83ff;">&lt;-</span> sym.attr.nb(x)
+    xattrs <span style="color: #4c83ff;">&lt;-</span> names(attributes(x))
+    z <span style="color: #4c83ff;">&lt;-</span> ifelse(focal, x, 0L)
+    <span style="color: #FBDE2D;">for</span> (i <span style="color: #FBDE2D;">in</span> seq(along= 1: n)[ focal]){
+        zi <span style="color: #4c83ff;">&lt;-</span> z[[ i]]
+        zn <span style="color: #4c83ff;">&lt;-</span> zi[zi %<span style="color: #FBDE2D;">in</span>% tgt.ids]
+        <span style="color: #FBDE2D;">if</span> (length(zn)== 0) z[[ i]] <span style="color: #4c83ff;">&lt;-</span> 0L
+        <span style="color: #FBDE2D;">else</span> z[[ i]] <span style="color: #4c83ff;">&lt;-</span> sort(unique(zn))
+    }
+    attr(z, <span style="color: #61CE3C;">"region.id"</span>) <span style="color: #4c83ff;">&lt;-</span>attr(x, <span style="color: #61CE3C;">"region.id"</span>)
+    <span style="color: #FBDE2D;">for</span> (i <span style="color: #FBDE2D;">in</span> 1:length(xattrs)) {
+        <span style="color: #FBDE2D;">if</span> (xattrs[i] != <span style="color: #61CE3C;">"region.id"</span>) 
+            attr(z, xattrs[i]) <span style="color: #4c83ff;">&lt;-</span> attr(x, xattrs[i])
+    }
+    z <span style="color: #4c83ff;">&lt;-</span> sym.attr.nb(z)
+    z
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7-2" class="outline-3">
+<h3 id="sec-7-2"><span class="section-number-3">7.2</span> <a id="SFL" name="SFL"></a> Subset function for <code>listw</code> objects</h3>
+<div class="outline-text-3" id="text-7-2">
+<p>
+Below the <code>lwsubset</code> function, that is the symmetric of previous
+<code>nbsubset</code> function for the <code>listw</code> objects. The code is not
+finished because of the function <code>nb2listw</code> that cannot admits
+units without neighbors and the presence of rectangular <code>nb</code>
+relationships from <code>nbsubset</code>.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-R"><span style="color: #ff1493;">lwsubset</span> <span style="color: #4c83ff;">&lt;-</span> <span style="color: #FBDE2D;">function</span> (x, focal= rep(<span style="color: #D8FA3C;">TRUE</span>, length(x)),
+                      target= rep(<span style="color: #D8FA3C;">TRUE</span>, length(x)), zero.policy = <span style="color: #D8FA3C;">NULL</span>, ...){
+    <span style="color: #FBDE2D;">if</span> (!inherits(x, <span style="color: #61CE3C;">"listw"</span>)) 
+        <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"not a weights list"</span>)
+    <span style="color: #FBDE2D;">if</span> (is.null(zero.policy)) 
+        zero.policy <span style="color: #4c83ff;">&lt;-</span> get(<span style="color: #61CE3C;">"zeroPolicy"</span>, envir = .spdepOptions)
+    stopifnot(is.logical(zero.policy))
+    <span style="color: #FBDE2D;">if</span> (!is.logical(focal)) 
+        <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"focal not a logical vector"</span>)
+    <span style="color: #FBDE2D;">if</span> (!is.logical(target)) 
+        <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"target not a logical vector"</span>)
+    nb <span style="color: #4c83ff;">&lt;-</span> x$neighbours
+    vlist <span style="color: #4c83ff;">&lt;-</span> x$weights
+    <span style="color: #FBDE2D;">if</span> (attr(vlist, <span style="color: #61CE3C;">"mode"</span>) != <span style="color: #61CE3C;">"binary"</span>) 
+        <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"Not yet able to subset general weights lists"</span>)
+    style <span style="color: #4c83ff;">&lt;-</span> x$style
+    n <span style="color: #4c83ff;">&lt;-</span> length(nb)
+    <span style="color: #FBDE2D;">if</span> (n != length(focal)) 
+        <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"neighbours list and focal vector different lengths"</span>)
+    <span style="color: #FBDE2D;">if</span> (n != length(target)) 
+        <span style="color: #FBDE2D;">stop</span>(<span style="color: #61CE3C;">"neighbours list and target vector different lengths"</span>)
+    subnb <span style="color: #4c83ff;">&lt;-</span> nbsubset(nb, focal, target)
+    sublistw <span style="color: #4c83ff;">&lt;-</span> nb2listw(neighbours= subnb, glist= <span style="color: #D8FA3C;">NULL</span>,
+                         style= style, zero.policy= zero.policy)
+    sublistw
+}
+</pre>
+</div>
 </div>
 </div>
 </div>
@@ -1266,6 +1505,11 @@ authors, we adopt here those of the <b>R</b> package <code>spdep</code> (Bivand,
 </p></div>
 
 <div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+Does the geo-statistical literature is concerned with marginal
+effects of covariates? Somme papers?
+</p></div>
+
+<div class="footdef"><sup><a id="fn.3" name="fn.3" class="footnum" href="#fnr.3">3</a></sup> <p class="footpara">
 In particular, it could be of interest to predict outcome
 values for units with known \(y\) for diagnostic, goodness-of-fit
 purposes or computations of marginal effects of covariates.
