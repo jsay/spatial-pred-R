@@ -13,22 +13,22 @@
 # HTML_HEAD:   <base target="_blank">
 #+BEGIN_abstract
 This document presents an integrative framework to make predictions
-from spatial autoregressive models \cite{COrd73, COrd81, Anse88}. It
+from spatial autoregressive models (\cite{COrd73, COrd81, Anse88}). It
 also contains the corresponding [[url:http://www.r-project.org][*R* code]] to implement the predictors
 presented. The code is tangled into the [[./sppred.R][=sppred=]] function that
-implements in particular the predictors from LeSage and Pace
-(2004, 2008) and Kelejian and Prucha (2004) for a large number of
-specifications of spatial autocorrelation from the [[url:http://cran.r-project.org/web/packages/spdep/index.html][=spdep= package]]
-(Bivand 2014). To use this code, save the file [[./sppred.R][=sppred=]] in your
-working directory then submit =source("sppred.R")= to *R*. Some
-examples on the =boston= data are also available at section XX. The
-status of this work is actually under construction, comments are
-welcome.\\
+implements in particular the predictors from \cite{LPac04, PLes08} and
+\cite{KPru07} for a large number of specifications of spatial
+autocorrelation from the [[url:http://cran.r-project.org/web/packages/spdep/index.html][=spdep= package]] (\cite{Biva14}). To use this
+code, save the file [[./sppred.R][=sppred=]] in your working directory then submit
+=source("sppred.R")= to *R*. Some examples on the =boston= data are
+also available at section XX. The status of this work is actually
+under construction, comments are welcome.\\
 
 *=STILL TODO=* 
 - Code the variances and confidence intervals of predictors
 - Code the weight matrix for ex-sample predictions
 - Code the predictors for =sphet= and =splm= objects
+- Allow models with transformed outcome variable
 #+END_abstract
 #+TOC: headlines 1
 
@@ -41,7 +41,7 @@ welcome.\\
   # number={1},
   # pages={66-76}
 
-* Theoretical Framework
+* Theoretical framework
 ** Spatial econometric models
 
    The particularity of spatial econometric models is the /ex ante/
@@ -53,17 +53,17 @@ welcome.\\
    dependent variable sample data observations.  This implies that the
    sample pattern of the outcomes or the residuals contains additional
    information which may be used to modify the regression function so
-   as to reduce the prediction variance (Goldberger 1962). [[cite:COrd73]]
+   as to reduce the prediction variance [[cite:Gold62]].
 
    The literature about predicting from spatial econometric models is
    not actually unified, due to different modeling frameworks and
-   notations: see LeSage and Pace (2004, 2008) and Kelejian and Prucha
-   (2004).  A first contribution of this document is to unify the
-   different predictors proposed in the literature into an integrative
-   spatial econometric framework.  A second contribution is to present
-   the *R* function =sppred= that implements all the spatial
-   predictors and presents some empirical evidence on their relative
-   performance on a well-known dataset (=boston=, Bivand 2014).
+   notations: see \cite{LPac04, PLes08} and \cite{KPru07}.  A first
+   contribution of this document is to unify the different predictors
+   proposed in the literature into an integrative spatial econometric
+   framework.  A second contribution is to present the *R* function
+   =sppred= that implements all the spatial predictors and presents
+   some empirical evidence on their relative performance on a
+   well-known dataset (=boston=, \cite{Biva14}).
 
    We present analytically the available predictors from spatial
    econometric models estimated on a sample of $N$ spatial units. We
@@ -120,8 +120,18 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
    estimated simultaneously and it makes no sens to consider $\Theta$
    as partially known.  Hence, the predictors presented are all
    conditioned by $\Theta$, which is dropped from conditioning sets
-   for the sake of clarity. So its not the true BLUP but an
-   approximation.
+   for the sake of clarity.  So its not the true BLUP but an
+   approximation, in this framework parameters are exogenous. In the
+   bivariate formulation, This is the general BLUP framework shared by
+   all the literature.  The minimum mean square error predictor (the
+   best) is the conditional mean corresponding to the information set.
+   [normal expression here]. In the loo case, it is strange because
+   the information set is different for each prediction and there is a
+   contradiction about the information sets between two
+   predictions. Without this contradiction we are in LSP with
+   partitioned matrix. Our distinction between stochastic and non
+   stochastic part can be linked to signal and trend terminology
+   [[cite:Hain93]].
 
    Finally, note that geo-statistical models (typically from the
    kriging methods, \cite{CCas93}) are aware about the need for using
@@ -134,6 +144,22 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
    reverse is not true.[fn:3]
 
 ** Implementing predictions
+
+   The interest in predicting from spatial econometric models are
+   multiple and the code used for this have to be customizable because
+   different reasons lead to different predictors. One can cite with
+   [[cite:PLes08]]:
+   - implement counter-factual predictions to better interpret (direct
+     and indirect effects)
+   - extrapolate into the future the outcome variable of interest
+   - predictors are smoother, so more easily understood as a map
+   - Detect general spatial patterns, for the effect of modeling space (trends
+     vs signal)
+   - fill in the gap in the case of spatially missing observations of
+     the outcome variable.
+   Trade-off between simplicity and efficiency according to the
+   information set used, and it depends on case study so it is
+   important for a software to implement numerous.
 
    Basically, we consider $M$ target spatial units for which we want
    to predict the values of the outcome $y$.  These units may or may
@@ -219,6 +245,9 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
                                         + \Omega_{21}\Omega_{11}^{-1}(y_{IS}-\mathbf{E}(y_{IS}\mid X, W))
 \end{equation}
 
+   We can then take an example of custom predictions with the ex post
+   forecasting.
+
    If we put aside the differences in the conditional mean of the
    exogenous part, this predictor =predKP2= is identical to [[ref:prdLSP][prdLSP]].
 
@@ -245,6 +274,9 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
    in \cite{BCHo07} (models?), LSP in Kato (models?)
 
 ** A taxonomy of spatial sample schemes
+
+   ex-post predictions, for the temporal dimension. ex-ante we have to
+   also estimate the independent variables
 
    In spatial econometrics, the usual distinction between in-sample
    (IS) and out-of-sample (OS) predictions has firstly to be
@@ -286,7 +318,7 @@ library(spdep) ; predict.sarlm
   models. For that, we have to put =legacy=== =FALSE=. The signal is
   computed by difference for the lag models in out of sample.
 
-* The =sppred= extension
+* The new =sppred= extension
 ** General Structure
 
    Here is the general structure of the functions that call
@@ -304,9 +336,9 @@ library(spdep) ; predict.sarlm
 
 #+begin_src R :results silent :tangle ./sppred.R
 sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
-                   condset= "DEF", blup = NULL, loo = FALSE, power = NULL,
-                   zero.policy = NULL, legacy = TRUE, order = 250,
-                   tol= .Machine$double.eps^(3/5), ...) {
+                   condset= "DEF", blup = NULL, loo = FALSE, rg = NULL,
+                   power = NULL, zero.policy = NULL, legacy = TRUE, order = 250,
+                   tol= .Machine$double.eps^(3/5), ..., tst= 1) {
     require(spdep)
     ## USUAL VERIFICATIONS
     if (is.null(zero.policy)) 
@@ -319,8 +351,7 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
         mod <- ifelse(object$etype== "error", "sem", "sxm")
     } else {
         mod <- switch(object$type, "lag"= "sar", "mixed"= "sdm",
-                                   "sac"= "sac", "sacmixed"= "smc")
-    }
+                                   "sac"= "sac", "sacmixed"= "smc")}
     ## DATA SHAPING
     if (mod %in% c("sem", "sxm")) {lab= object$lambda ; rho= 0         }
     if (mod %in% c("sar", "sdm")) {lab= 0             ; rho= object$rho}
@@ -336,31 +367,33 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
         X   <- model.matrix(mt, mf)
         if (any(object$aliased)) X <- X[, -which(object$aliased)]
     }
-    ## WEIGHT MATRIX, add an error message
+    ## WEIGHT MATRIX
     if (is.null(listw)) lsw <- eval(object$call$listw) else lsw <- listw
     ## PREDICTORS
     if (is.null(blup)){
         pt <- switch(condset, "X"= 1, "XW"= 2, "DEF"= 3, "XWy"= 4)
     } else {
-        pt <- switch(blup, "LSP"= 5, "KP2"= 6, "KP3"= 7, "KPG"= 8)
+        pt <- switch(blup, "LSP"= 5, "KPG"= 6, "KP2"= 7, "KP3"= 8)
     }
     prdX <- as.vector(X %*% B)
     if (pt> 1) prdWX   <- prdWX(prdX, X, Bl, mod, lsw)
     if (pt> 2 && pt!= 4) prdKP1  <- prdKP1(prdWX, rho, lsw, power, order, tol)
-    if (pt> 3){
+    if (pt> 3 && tst== 1){
         prdWXy <- prdWX+
             rho* lag.listw(lsw, yobs)+ lab* lag.listw(lsw, yobs- prdWX)}
+    if (pt> 3 && tst== 2){
+        prdWXy <- prdWX+ rho* lag.listw(lsw, yobs)}
     if (pt==5) prdLSP <- prdLSP(prdKP1, rho, lab, lsw, yobs, loo)
-    if (pt> 5 && !loo) stop("Set loo= TRUE for this blup predictor")
-    if (pt==6){
+    if (pt==6) prdKPG <- prdKPG(prdKP1, prdWXy, rg, yobs)
+    if (pt> 6 && !loo) stop("Set loo= TRUE for this blup predictor")
+    if (pt==7){
         prdKP2 <- prdKP2(prdKP1, prdWXy,
                          rho, lab, lsw, yobs, power, order, tol)}
-    if (pt==7){
+    if (pt==8){
         prdKP3 <- prdKP3(prdKP1, prdWXy,
                          rho, lab, lsw, yobs, power, order, tol)}
-    if (pt==8) stop("not implemented")
     prd <- switch(pt, "1"= prdX  , "2"= prdWX , "3"= prdKP1, "4"= prdWXy,
-                      "5"= prdLSP, "6"= prdKP2, "7"= prdKP3, "8"= prdKPG)
+                      "5"= prdLSP, "6"= prdKPG, "7"= prdKP2, "8"= prdKP3)
     class(prd) <- "sppred" ; as.vector(prd)
 }
 #+end_src
@@ -416,7 +449,6 @@ prdKP1 <- function(prdWX, rho= rho, lsw= lsw,
 *** BLUP LSP
 
     It can make sens to distinguish one shot to one leave one.
-
 
 #+begin_src R :results silent :tangle ./sppred.R
 prdLSP <- function(prdKP1, rho= rho, lab= lab,
@@ -487,14 +519,25 @@ prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
 }
 #+end_src
 
-** Predictors conditioned by hand
+*** BLUP Generalized
 
-   Try with
-
-#+BEGIN_QUOTE
-        rg <- sum.u[i, ] %*% GR %*% solve(sum.y)
-        prdKP3[ i] <- prdWXy[ i]+ (rg %*% (yobs- prdKP1))
-#+END_QUOTE
+#+begin_src R :results silent :tangle ./sppred.R
+prdKPG <- function(prdKP1, prdWXy= prdWXy, yobs= yobs, rg= rg, loo= loo){
+    if(dim(rg)[ 1]!= length(yobs) || dim(rg)[ 2]!= length(yobs))
+        stop("BLUP correction is not of the good dimension")
+    if (loo){
+        prdKPG <- matrix(NA, ncol= 1, nrow= length(prdWXy))
+        for (i in 1: length(prdWXy)){
+            prdKPG[ i] <- prdWXy[ i]-
+                (rg[i, -i] %*% (yobs[ -i]- prdKP1[ -i])/ rg[i, i])
+        }
+    } else {
+        rgd <- rg
+        prdKPG <- prdWXy+ ((solve(rgd) %*% rg %*% (yobs- prdKP1)))
+    }
+    prdKPG
+}
+#+end_src
 
 * How it works
 ** Choosing a type of predictor
@@ -729,12 +772,12 @@ SAC <- sacsarlm(  ARlog03~ PXLB03+ RTFO03+ BdAlti, data= exsmp$Dat.cal,
 SMC <- sacsarlm(  ARlog03~ PXLB03+ RTFO03+ BdAlti, data= exsmp$Dat.cal,
                   exsmp$Wgt.cal, method= "eigen", type= "sacmixed")
 SPMOD <- list(SEM= SEM, SXM= SXM, SAR= SAR, SDM= SDM, SAC= SAC, SMC= SMC)
-rbind(lapply(spmod, AIC))
+rbind(lapply(SPMOD, AIC))
 #+end_src
 
 #+RESULTS:
-:      sem       sxm       sar       sdm       sac       smc      
-: [1,] -132.4525 -164.1509 -139.7872 -163.6526 -142.8058 -163.1881
+:      SEM      SXM      SAR      SDM      SAC      SMC    
+: [1,] 445.7127 433.3333 435.5886 434.1438 436.3016 435.197
 
 ** Constructing spatial weight matrix
 
@@ -1005,11 +1048,34 @@ BLUP2[1: 10, 1: 10]
    It is OK. It stay the question about using the computing capacity
    of =spdep= in this framework.
 
+** Custom predictions
+
+   It can be called ex-post predictions because explanatory variables
+   are known.
+
+#+begin_src R :results output exemple
+source("sppred.R")
+SEMprdKP1 <- sppred(SEM, blup= "LSP")
+sqrt(mean(I(SEMprdKP1- SEM$y)^2))
+SEMprdKPG <- sppred(SEM, blup= "KPG")
+
+SEMprdKP1 <- sppred(SEM, blup= "LSP", loo= TRUE)
+sqrt(mean(I(SEMprdKP1- SEM$y)^2))
+
+SXMprdXWy <- sppred(SXM, blup= "LSP", loo= TRUE)
+sqrt(mean(I(SXMprdXWy- SXM$y)^2))
+
+rg <- sum.u[i, ] %*% GR %*% solve(sum.y)
+prdKP3[ i] <- prdWXy[ i]+ (rg %*% (yobs- prdKP1))
+#+end_src
+
 * Summary
 ** Changes relative to =predict.sarlm=
 
    - Implement predictions for SARAR and Mixed SARAR models from
-     respectively =sac= and =sacmixed= classes.
+     respectively =sac= and =sacmixed= classes
+   - Drop the use of =tarX= and =tary= that can produce a loss of
+     rapidity
    - Compute BLUP and almost BLUP spatial predictors
    - About the in-sample / out of sample structure (=newdata=)
    - About the distinction between trend and signal
@@ -1115,12 +1181,12 @@ lwsubset <- function (x, focal= rep(TRUE, length(x)),
 
 * Footnotes
 
-[fn:1] This terminology comes from LeSage and Pace (2009) and Bivand
-  (2014). This model is also called spatial autoregressive model with
-  autoregressive disturbances, SARAR(1,1), by Kelejian and Prucha
-  (1998). The notations of spatial lag coefficients also depends on
-  authors, we adopt here those of the *R* package =spdep= (Bivand,
-  2014).
+[fn:1] This terminology comes from \cite{LPac08} and
+  \cite{BPGo08}. This model is also called spatial autoregressive
+  model with autoregressive disturbances, SARAR(1,1), by
+  \cite{KPru98}. The notations of spatial lag coefficients also
+  depends on authors, we adopt here those of the *R* package =spdep=
+  (Bivand, 2014).
 
 [fn:2] In particular, it could be of interest to predict outcome
   values for units with known $y$ for diagnostic, goodness-of-fit

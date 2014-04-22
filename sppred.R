@@ -1,8 +1,8 @@
 
 sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
-                   condset= "DEF", blup = NULL, loo = FALSE, power = NULL,
-                   zero.policy = NULL, legacy = TRUE, order = 250,
-                   tol= .Machine$double.eps^(3/5), ...) {
+                   condset= "DEF", blup = NULL, loo = FALSE, rg = NULL,
+                   power = NULL, zero.policy = NULL, legacy = TRUE, order = 250,
+                   tol= .Machine$double.eps^(3/5), ..., tst= 1) {
     require(spdep)
     ## USUAL VERIFICATIONS
     if (is.null(zero.policy)) 
@@ -15,8 +15,7 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
         mod <- ifelse(object$etype== "error", "sem", "sxm")
     } else {
         mod <- switch(object$type, "lag"= "sar", "mixed"= "sdm",
-                                   "sac"= "sac", "sacmixed"= "smc")
-    }
+                                   "sac"= "sac", "sacmixed"= "smc")}
     ## DATA SHAPING
     if (mod %in% c("sem", "sxm")) {lab= object$lambda ; rho= 0         }
     if (mod %in% c("sar", "sdm")) {lab= 0             ; rho= object$rho}
@@ -32,31 +31,33 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
         X   <- model.matrix(mt, mf)
         if (any(object$aliased)) X <- X[, -which(object$aliased)]
     }
-    ## WEIGHT MATRIX, add an error message
+    ## WEIGHT MATRIX
     if (is.null(listw)) lsw <- eval(object$call$listw) else lsw <- listw
     ## PREDICTORS
     if (is.null(blup)){
         pt <- switch(condset, "X"= 1, "XW"= 2, "DEF"= 3, "XWy"= 4)
     } else {
-        pt <- switch(blup, "LSP"= 5, "KP2"= 6, "KP3"= 7, "KPG"= 8)
+        pt <- switch(blup, "LSP"= 5, "KPG"= 6, "KP2"= 7, "KP3"= 8)
     }
     prdX <- as.vector(X %*% B)
     if (pt> 1) prdWX   <- prdWX(prdX, X, Bl, mod, lsw)
     if (pt> 2 && pt!= 4) prdKP1  <- prdKP1(prdWX, rho, lsw, power, order, tol)
-    if (pt> 3){
+    if (pt> 3 && tst== 1){
         prdWXy <- prdWX+
             rho* lag.listw(lsw, yobs)+ lab* lag.listw(lsw, yobs- prdWX)}
+    if (pt> 3 && tst== 2){
+        prdWXy <- prdWX+ rho* lag.listw(lsw, yobs)}
     if (pt==5) prdLSP <- prdLSP(prdKP1, rho, lab, lsw, yobs, loo)
-    if (pt> 5 && !loo) stop("Set loo= TRUE for this blup predictor")
-    if (pt==6){
+    if (pt==6) prdKPG <- prdKPG(prdKP1, prdWXy, rg, yobs)
+    if (pt> 6 && !loo) stop("Set loo= TRUE for this blup predictor")
+    if (pt==7){
         prdKP2 <- prdKP2(prdKP1, prdWXy,
                          rho, lab, lsw, yobs, power, order, tol)}
-    if (pt==7){
+    if (pt==8){
         prdKP3 <- prdKP3(prdKP1, prdWXy,
                          rho, lab, lsw, yobs, power, order, tol)}
-    if (pt==8) stop("not implemented")
     prd <- switch(pt, "1"= prdX  , "2"= prdWX , "3"= prdKP1, "4"= prdWXy,
-                      "5"= prdLSP, "6"= prdKP2, "7"= prdKP3, "8"= prdKPG)
+                      "5"= prdLSP, "6"= prdKPG, "7"= prdKP2, "8"= prdKP3)
     class(prd) <- "sppred" ; as.vector(prd)
 }
 
@@ -142,4 +143,20 @@ prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
         prdKP3[ i] <- prdWXy[ i]+ (rg %*% (yobs[i ]- prdKP1[-i ]))
     }
     prdKP3
+}
+
+prdKPG <- function(prdKP1, prdWXy= prdWXy, yobs= yobs, rg= rg, loo= loo){
+    if(dim(rg)[ 1]!= length(yobs) || dim(rg)[ 2]!= length(yobs))
+        stop("BLUP correction is not of the good dimension")
+    if (loo){
+        prdKPG <- matrix(NA, ncol= 1, nrow= length(prdWXy))
+        for (i in 1: length(prdWXy)){
+            prdKPG[ i] <- prdWXy[ i]-
+                (rg[i, -i] %*% (yobs[ -i]- prdKP1[ -i])/ rg[i, i])
+        }
+    } else {
+        rgd <- rg
+        prdKPG <- prdWXy+ ((solve(rgd) %*% rg %*% (yobs- prdKP1)))
+    }
+    prdKPG
 }
