@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Extending Predictions from Spatial Econometric Models on R</title>
-<!-- 2014-04-20 dim. 10:50 -->
+<!-- 2014-04-23 mer. 18:19 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Jean-Sauveur AY \\ \lt[[mailto:jsay.site@gmail.com][jsay.site@gmail.com]]jsay.site@gmail.com\gt \and Raja CHAKIR\\ \lt[[mailto:chakir@grignon.inra.fr][chakir@grignon.inra.fr]]chakir@grignon.inra.fr\gt\\ \and Julie LE GALLO\\ \lt[[mailto:jlegallo@univ-fcomte.fr][jlegallo@univ-fcomte.fr]]jlegallo@univ-fcomte.fr\gt" />
@@ -257,7 +257,7 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">1. Theoretical Framework</a>
+<li><a href="#sec-1">1. Theoretical framework</a>
 <ul>
 <li><a href="#sec-1-1">1.1. Spatial econometric models</a></li>
 <li><a href="#sec-1-2">1.2. Implementing predictions</a></li>
@@ -352,7 +352,7 @@ under construction, comments are welcome.<br  />
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">1. Theoretical Framework</a></li>
+<li><a href="#sec-1">1. Theoretical framework</a></li>
 <li><a href="#sec-2">2. Current function from <code>spdep</code></a></li>
 <li><a href="#sec-3">3. The new <code>sppred</code> extension</a></li>
 <li><a href="#sec-4">4. How it works</a></li>
@@ -364,7 +364,7 @@ under construction, comments are welcome.<br  />
 </div>
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1"><span class="section-number-2">1</span> Theoretical Framework</h2>
+<h2 id="sec-1"><span class="section-number-2">1</span> Theoretical framework</h2>
 <div class="outline-text-2" id="text-1">
 </div><div id="outline-container-sec-1-1" class="outline-3">
 <h3 id="sec-1-1"><span class="section-number-3">1.1</span> Spatial econometric models</h3>
@@ -458,8 +458,18 @@ depends on the sample size.  Moreover, all the parameters are
 estimated simultaneously and it makes no sens to consider \(\Theta\)
 as partially known.  Hence, the predictors presented are all
 conditioned by \(\Theta\), which is dropped from conditioning sets
-for the sake of clarity. So its not the true BLUP but an
-approximation, in this framework parameters are exogenous.
+for the sake of clarity.  So its not the true BLUP but an
+approximation, in this framework parameters are exogenous. In the
+bivariate formulation, This is the general BLUP framework shared by
+all the literature.  The minimum mean square error predictor (the
+best) is the conditional mean corresponding to the information set.
+[normal expression here]. In the loo case, it is strange because
+the information set is different for each prediction and there is a
+contradiction about the information sets between two
+predictions. Without this contradiction we are in LSP with
+partitioned matrix. Our distinction between stochastic and non
+stochastic part can be linked to signal and trend terminology
+[<a href="#Hain93">Hain93</a>].
 </p>
 
 <p>
@@ -478,6 +488,33 @@ reverse is not true.<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2"
 <div id="outline-container-sec-1-2" class="outline-3">
 <h3 id="sec-1-2"><span class="section-number-3">1.2</span> Implementing predictions</h3>
 <div class="outline-text-3" id="text-1-2">
+<p>
+The interest in predicting from spatial econometric models are
+multiple and the code used for this have to be customizable because
+different reasons lead to different predictors. One can cite with
+[<a href="#PLes08">PLes08</a>]:
+</p>
+<ul class="org-ul">
+<li>implement counter-factual predictions to better interpret (direct
+and indirect effects)
+</li>
+<li>extrapolate into the future the outcome variable of interest
+</li>
+<li>predictors are smoother, so more easily understood as a map
+</li>
+<li>Detect general spatial patterns, for the effect of modeling space (trends
+vs signal)
+</li>
+<li>fill in the gap in the case of spatially missing observations of
+the outcome variable.
+</li>
+</ul>
+<p>
+Trade-off between simplicity and efficiency according to the
+information set used, and it depends on case study so it is
+important for a software to implement numerous.
+</p>
+
 <p>
 Basically, we consider \(M\) target spatial units for which we want
 to predict the values of the outcome \(y\).  These units may or may
@@ -513,7 +550,8 @@ formulated as a conditional expectation relative to it.
 
 <p>
 This correspond to KP1 but also the exogenous predictor of LSP. It
-is the default predictor of the function <code>sppred</code>.
+is the default predictor of the function <code>sppred</code>. As LSP shown,
+the \(X\) from the neighbors are used to predict.
 </p>
 
 \begin{equation}
@@ -581,6 +619,11 @@ yopla
 \tag{prdKP2}\mathbf{E}(y_i\mid X, W, y_{IS})= \rho Wy+ X\widehat{\beta}+ WX\widehat{\theta}
                                         + \Omega_{21}\Omega_{11}^{-1}(y_{IS}-\mathbf{E}(y_{IS}\mid X, W))
 \end{equation}
+
+<p>
+We can then take an example of custom predictions with the ex post
+forecasting.
+</p>
 
 <p>
 If we put aside the differences in the conditional mean of the
@@ -852,7 +895,6 @@ models. The computations are in the general.
 <p>
 It can make sens to distinguish one shot to one leave one.
 </p>
-
 
 <div class="org-src-container">
 
@@ -1353,7 +1395,10 @@ perform best is fuzzy.
 <div class="outline-text-3" id="text-6-1">
 <ul class="org-ul">
 <li>Implement predictions for SARAR and Mixed SARAR models from
-respectively <code>sac</code> and <code>sacmixed</code> classes.
+respectively <code>sac</code> and <code>sacmixed</code> classes
+</li>
+<li>Drop the use of <code>tarX</code> and <code>tary</code> that can produce a loss of
+rapidity
 </li>
 <li>Compute BLUP and almost BLUP spatial predictors
 </li>
@@ -1401,6 +1446,14 @@ in the presence of \(WX\).
 
 </p>
 
+<p><a name="BPGo08"></a>
+
+<b>Bivand, R.&nbsp;S., E.&nbsp;J. Pebesma and V.&nbsp;G&oacute;mez-Rubio</b> (2008). <em>
+  Applied Spatial Data Analysis with <b>R</b></em>. Springer.
+[&nbsp;<a href="BibPrd_bib.html#BPGo08">bib</a>&nbsp;]
+
+</p>
+
 <p><a name="BCHo07"></a>
 
 <b>Bourassa, S.&nbsp;C., E.&nbsp;Cantoni and M.&nbsp;Hoesli</b> (2007). Spatial dependence,
@@ -1443,12 +1496,38 @@ in the presence of \(WX\).
 
 </p>
 
+<p><a name="Hain93"></a>
+
+<b>Haining, R.</b> (1993). <em>Spatial Data Analysis in the Social and
+  Environmental Sciences</em>. Cambridge University Press.
+[&nbsp;<a href="BibPrd_bib.html#Hain93">bib</a>&nbsp;]
+
+</p>
+
+<p><a name="KPru98"></a>
+
+<b>Kelejian, H.&nbsp;H. and I.&nbsp;R. Prucha</b> (1998). A generalized spatial
+  two-stage least squares procedure for estimating a spatial autoregressive
+  model with autoregressive disturbances. <em>The Journal of Real Estate
+  Finance and Economics</em> 17: 99-121.
+[&nbsp;<a href="BibPrd_bib.html#KPru98">bib</a>&nbsp;]
+
+</p>
+
 <p><a name="KPru07"></a>
 
 <b>Kelejian, H.&nbsp;H. and I.&nbsp;R. Prucha</b> (2007). The relative efficiencies of
   various predictors in spatial econometric models containing spatial lags.
   <em>Regional Science and Urban Economics</em> 37: 363-374.
 [&nbsp;<a href="BibPrd_bib.html#KPru07">bib</a>&nbsp;]
+
+</p>
+
+<p><a name="LPac08"></a>
+
+<b>LeSage, J. and R.&nbsp;K. Pace</b> (2008). <em>Introduction to Spatial
+  Econometrics</em>. CRC press.
+[&nbsp;<a href="BibPrd_bib.html#LPac08">bib</a>&nbsp;]
 
 </p>
 
@@ -1588,12 +1667,12 @@ relationships from <code>nbsubset</code>.
 <div id="text-footnotes">
 
 <div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
-This terminology comes from LeSage and Pace (2009) and Bivand
-(2014). This model is also called spatial autoregressive model with
-autoregressive disturbances, SARAR(1,1), by Kelejian and Prucha
-(1998). The notations of spatial lag coefficients also depends on
-authors, we adopt here those of the <b>R</b> package <code>spdep</code> (Bivand,
-2014).
+This terminology comes from [<a href="#LPac08">LPac08</a>] and
+[<a href="#BPGo08">BPGo08</a>]. This model is also called spatial autoregressive
+model with autoregressive disturbances, SARAR(1,1), by
+[<a href="#KPru98">KPru98</a>]. The notations of spatial lag coefficients also
+depends on authors, we adopt here those of the <b>R</b> package <code>spdep</code>
+(Bivand, 2014).
 </p></div>
 
 <div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">

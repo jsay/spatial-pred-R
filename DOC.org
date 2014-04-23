@@ -189,7 +189,8 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
 \end{equation}
 
    This correspond to KP1 but also the exogenous predictor of LSP. It
-   is the default predictor of the function =sppred=.
+   is the default predictor of the function =sppred=. As LSP shown,
+   the $X$ from the neighbors are used to predict.
 
 \begin{equation}
 \tag{PRD4}\mathbf{E}(y\mid X, W, Wy)= \rho Wy+ X\widehat{\beta}+ WX\widehat{\theta}+ \lambda (Wy- X\beta- WX\theta)
@@ -813,7 +814,6 @@ SMCprdX <- sppred(SMC, condset= "X")
 sqrt(mean(I(SMCprdX- SMC$y)^2))
 SMCprdX <- sppred(SMC, newdata= exsmp$Dat.cal, condset= "X", power= T)
 sqrt(mean(I(SMCprdX- SMC$y)^2))
-
 ## A ESSAYER AVEC L'AUTRE BASE SPATIALE
 #+end_src
 
@@ -1020,6 +1020,7 @@ plot(yop, SMCprdKP3)
 #+end_src
 
 ** Proof of Harville's simplification
+*** For the SAR case
 
    To be implemented we need to be in the case of ex-sample
    prediction. Hopefully, our data.frame allows that.
@@ -1036,17 +1037,101 @@ OMG <- solve(Z) %*% solve(t(Z)) # isSymmetric(OMG) TRUE
 OMG11 <- OMG[ CAL,  CAL] ; OMG22 <- OMG[!CAL, !CAL]
 OMG12 <- OMG[ CAL, !CAL] ; OMG21 <- OMG[!CAL,  CAL]
 BLUP1 <- OMG21 %*% solve(OMG11)
-BLUP1[1: 10, 1: 10]
+BLUP1[1: 10, 1: 5]
 ## METHODE PAR LA MATRICE DE PRECISION
 PHI <- t(Z) %*% Z # isSymmetric(PHI) TRUE
 PHI11 <- PHI[ CAL,  CAL] ; PHI22 <- PHI[!CAL, !CAL]
 PHI12 <- PHI[ CAL, !CAL] ; PHI21 <- PHI[!CAL,  CAL]
 BLUP2 <- - solve(PHI22) %*% PHI21
-BLUP2[1: 10, 1: 10]
+BLUP2[1: 10, 1: 5]
 #+end_src
 
-   It is OK. It stay the question about using the computing capacity
-   of =spdep= in this framework.
+   It is OK. Now, we look if this property stay true in the case of
+   SAC model
+
+*** For the SAC case
+
+#+begin_src R :results output exemple
+Zr <- (diag(dim(WALL)[ 1])- (.33* WALL))
+Zl <- (diag(dim(WALL)[ 1])- (.55* WALL))
+## METHODE PAR LA MAT COV-VAR
+OMG <- solve(Zr) %*% solve(Zl) %*% solve(t(Zl)) %*% solve(t(Zr)) 
+## isSymmetric(OMG) TRUE
+OMG11 <- OMG[ CAL,  CAL] ; OMG22 <- OMG[!CAL, !CAL]
+OMG12 <- OMG[ CAL, !CAL] ; OMG21 <- OMG[!CAL,  CAL]
+BLUP1 <- OMG21 %*% solve(OMG11)
+BLUP1[1: 10, 1: 5]
+## METHODE PAR LA MATRICE DE PRECISION
+PHI <- t(Zr) %*% t(Zl) %*% Zl %*% Zr # isSymmetric(PHI) TRUE
+PHI11 <- PHI[ CAL,  CAL] ; PHI22 <- PHI[!CAL, !CAL]
+PHI12 <- PHI[ CAL, !CAL] ; PHI21 <- PHI[!CAL,  CAL]
+BLUP2 <- - solve(PHI22) %*% PHI21
+BLUP2[1: 10, 1: 5]
+#+end_src
+
+   It is also OK, and it seems to be a good mean to simplify KP. It
+   stay the question about using the computing capacity of =spdep= in
+   this framework.
+
+*** For the KP case (SAC)
+
+    First we verify the equivalence in covariance terms.
+
+#+begin_src R :results output exemple
+Zr <- (diag(dim(WALL)[ 1])- (.33* WALL))
+Zl <- (diag(dim(WALL)[ 1])- (.55* WALL))
+## METHODE PAR LA MAT COV-VAR
+OMG <- solve(Zr) %*% solve(Zl) %*% solve(t(Zl)) %*% solve(t(Zr))
+OMG <- solve(t(Zl) %*% t(Zr) %*% Zr %*% Zl)
+BLUP1 <- OMG[1,-1] %*% solve(OMG[-1, -1])
+BLUP1[1: 3]
+## METHODE PAR KP3 stricto sensus
+NUM  <- (solve(Zl) %*% solve(t(Zl))) %*% solve(t(Zr))
+KP3 <- NUM[1, -1] %*% solve(OMG[-1, -1])
+KP3[1: 3] 
+## On retrouve KP3 par LSP
+rr <- (Zr %*% OMG)[1, -1] %*% solve(OMG[-1, -1])
+rr <- Zr[1, ] %*% OMG[, -1] %*% solve(OMG[-1, -1])
+rr[1: 3]
+## Avec la méthode des matrices de prec
+PHI <- t(Zr) %*% t(Zl) %*% Zl %*% Zr    
+rrr <- - solve(PHI[1, 1]) %*% (Zr[1, ] %*% PHI[,-1])
+rrr[1: 3] ## PAS PAREIL, ON PEUT PAS UTILISER PREC AVEC KP3
+## METHODE PAR KP2 stricto sensus
+(KP2 <- NUM[1, ] %*% WALL[1, ] %*% solve(WALL[1, ] %*% OMG %*% WALL[1, ]))
+## On retrouve KP2 par LSP
+ss <- (Zr %*% OMG)[1, ] %*% WALL[1, ] %*% solve(WALL[1, ] %*% OMG %*% WALL[1, ])
+ss
+uu <- Zr[1, ] %*% OMG %*% WALL[1, ] %*% solve(WALL[1, ] %*% OMG %*% WALL[1, ])
+uu
+#+end_src
+
+*** KP predictors without loo (SAC)
+
+#+begin_src R :results output exemple
+Zr <- (diag(dim(WALL)[ 1])- (.33* WALL))
+Zl <- (diag(dim(WALL)[ 1])- (.55* WALL))
+## CALCUL DE LA MAT COV-VAR
+OMG <- solve(t(Zl) %*% t(Zr) %*% Zr %*% Zl)
+## LOOP KP3
+blupKP3 <- rep(NA, 299)
+system.time(
+for(i in 1: 200){
+    blupKP3 <- rbind(blupKP3, (Zr %*% OMG)[i, -i] %*% solve(OMG[-i, -i]))
+})
+head(blupKP3[, 1: 5])
+bKP3 <- (Zr %*% OMG)[1: 5, -c(1: 5)] %*% solve(OMG[-c(1: 5), -c(1: 5)])
+head(bKP3[, 1: 5])
+## LOOP KP2
+blupKP2 <- c(NA)
+system.time(
+for(i in 1: 200){
+    blupKP2 <- c(blupKP2,
+                 (Zr %*% OMG)[i, ] %*% WALL[i, ] %*%
+                 solve(WALL[i, ] %*% OMG %*% WALL[i, ]))
+})
+blupKP2[ 1: 5]
+#+end_src
 
 ** Custom predictions
 
