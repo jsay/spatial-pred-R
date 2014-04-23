@@ -339,7 +339,7 @@ library(spdep) ; predict.sarlm
 sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
                    condset= "DEF", blup = NULL, loo = FALSE, rg = NULL,
                    power = NULL, zero.policy = NULL, legacy = TRUE, order = 250,
-                   tol= .Machine$double.eps^(3/5), ..., tst= 1) {
+                   tol= .Machine$double.eps^(3/5), ..., tst= 1, ctm= F) {
     require(spdep)
     ## USUAL VERIFICATIONS
     if (is.null(zero.policy)) 
@@ -395,7 +395,8 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
                          rho, lab, lsw, yobs, power, order, tol)}
     prd <- switch(pt, "1"= prdX  , "2"= prdWX , "3"= prdKP1, "4"= prdWXy,
                       "5"= prdLSP, "6"= prdKPG, "7"= prdKP2, "8"= prdKP3)
-    class(prd) <- "sppred" ; as.vector(prd)
+    if (ctm) prd <- prdctm(prdWX, rho, lab, lsw, yobs)
+    class(prd) <- "sppred" ; as.vector(prd) 
 }
 #+end_src
 
@@ -513,7 +514,7 @@ prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
     sum.u <- GL %*% t(GL) ; sum.y <- GR %*% sum.u %*% t(GR)
     prdKP3 <- matrix(NA, ncol= 1, nrow= length(prdWXy))    
     for (i in 1: length(prdKP3)){
-        rg <- sum.u[i, ] %*% GR[, -i] %*% solve(sum.y[-i, -i])
+        rg <- sum.u[i, ] %*% GR[, -i] %*% solve(sum.y)[-i, -i]
         prdKP3[ i] <- prdWXy[ i]+ (rg %*% (yobs[i ]- prdKP1[-i ]))
     }
     prdKP3
@@ -537,6 +538,19 @@ prdKPG <- function(prdKP1, prdWXy= prdWXy, yobs= yobs, rg= rg, loo= loo){
         prdKPG <- prdWXy+ ((solve(rgd) %*% rg %*% (yobs- prdKP1)))
     }
     prdKPG
+}
+#+end_src
+
+*** Custom Predictor
+
+#+begin_src R :results silent :tangle ./sppred.R
+prdctm <- function(prdWX, rho, lab, lsw, yobs){
+    W <- listw2mat(lsw)
+    Wy <- lag.listw(lsw, yobs)
+    fp <- (rho+ lab)* Wy + (rho* lab* W) %*% lag.listw(lsw, Wy)
+    sp <- (diag(dim(W)[ 1])- lab* W)%*% prdWX
+    prdCTM <- fp+ as.vector(sp)
+    prdCTM
 }
 #+end_src
 
@@ -949,9 +963,13 @@ sqrt(mean(I(SDMprdXWy- SDM$y)^2))
 *** KP2 predictor
 
 #+begin_src R :results output exemple
-source("sppred.R")
-SEMprdKP2 <- sppred(SEM, blup= "KP2", loo= TRUE)
+source("sppredF.R")
+system.time(SEMprdKP2 <- sppred(SEM, blup= "KP2", loo= TRUE, tst= 2))
 sqrt(mean(I(SEMprdKP2- SEM$y)^2))
+source("sppred.R")
+system.time(SEMpddKP2 <- sppred(SEM, blup= "KP2", loo= TRUE, tst= 2))
+sqrt(mean(I(SEMpddKP2- SEM$y)^2))
+
 SXMprdKP2 <- sppred(SXM, blup= "KP2", loo= TRUE)
 sqrt(mean(I(SXMprdKP2- SXM$y)^2))
 SARprdKP2 <- sppred(SAR, blup= "KP2", loo= TRUE)
@@ -972,6 +990,17 @@ sqrt(mean(I(SMCprdKP2- SMC$y)^2))
 *** KP3 predictor
 
 #+begin_src R :results output exemple
+source("sppredF.R")
+system.time(SEMprdKP3 <- sppred(SEM, blup= "KP3", loo= TRUE))
+sqrt(mean(I(SEMprdKP3- SEM$y)^2))
+source("sppred.R")
+system.time(SEMpddKP3 <- sppred(SEM, blup= "KP3", loo= TRUE))
+sqrt(mean(I(SEMpddKP3- SEM$y)^2))
+system.time(SEMpddCTM <- sppred(SEM, ctm= TRUE))
+sqrt(mean(I(SEMpddCTM- SEM$y)^2))
+
+
+
 source("sppred.R")
 SEMprdKP3 <- sppred(SEM, blup= "KP3", loo= TRUE)
 sqrt(mean(I(SEMprdKP3- SEM$y)^2))

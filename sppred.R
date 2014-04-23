@@ -2,7 +2,7 @@
 sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
                    condset= "DEF", blup = NULL, loo = FALSE, rg = NULL,
                    power = NULL, zero.policy = NULL, legacy = TRUE, order = 250,
-                   tol= .Machine$double.eps^(3/5), ..., tst= 1) {
+                   tol= .Machine$double.eps^(3/5), ..., tst= 1, ctm= F) {
     require(spdep)
     ## USUAL VERIFICATIONS
     if (is.null(zero.policy)) 
@@ -58,7 +58,8 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
                          rho, lab, lsw, yobs, power, order, tol)}
     prd <- switch(pt, "1"= prdX  , "2"= prdWX , "3"= prdKP1, "4"= prdWXy,
                       "5"= prdLSP, "6"= prdKPG, "7"= prdKP2, "8"= prdKP3)
-    class(prd) <- "sppred" ; as.vector(prd)
+    if (ctm) prd <- prdctm(prdWX, rho, lab, lsw, yobs)
+    class(prd) <- "sppred" ; as.vector(prd) 
 }
 
 prdWX <- function(prdX, X= X, Bl= Bl, mod= mod, lsw= lsw){
@@ -139,7 +140,7 @@ prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
     sum.u <- GL %*% t(GL) ; sum.y <- GR %*% sum.u %*% t(GR)
     prdKP3 <- matrix(NA, ncol= 1, nrow= length(prdWXy))    
     for (i in 1: length(prdKP3)){
-        rg <- sum.u[i, ] %*% GR[, -i] %*% solve(sum.y[-i, -i])
+        rg <- sum.u[i, ] %*% GR[, -i] %*% solve(sum.y)[-i, -i]
         prdKP3[ i] <- prdWXy[ i]+ (rg %*% (yobs[i ]- prdKP1[-i ]))
     }
     prdKP3
@@ -159,4 +160,13 @@ prdKPG <- function(prdKP1, prdWXy= prdWXy, yobs= yobs, rg= rg, loo= loo){
         prdKPG <- prdWXy+ ((solve(rgd) %*% rg %*% (yobs- prdKP1)))
     }
     prdKPG
+}
+
+prdctm <- function(prdWX, rho, lab, lsw, yobs){
+    W <- listw2mat(lsw)
+    Wy <- lag.listw(lsw, yobs)
+    fp <- (rho+ lab)* Wy + (rho* lab* W) %*% lag.listw(lsw, Wy)
+    sp <- (diag(dim(W)[ 1])- lab* W)%*% prdWX
+    prdCTM <- fp+ as.vector(sp)
+    prdCTM
 }
