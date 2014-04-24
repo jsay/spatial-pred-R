@@ -16,13 +16,13 @@ This document presents an integrative framework to make predictions
 from spatial autoregressive models (\cite{COrd73, COrd81, Anse88}). It
 also contains the corresponding [[url:http://www.r-project.org][*R* code]] to implement the predictors
 presented. The code is tangled into the [[./sppred.R][=sppred=]] function that
-implements in particular the predictors from \cite{LPac04, PLes08} and
+implements among other the predictors from \cite{LPac04, PLes08} and
 \cite{KPru07} for a large number of specifications of spatial
 autocorrelation from the [[url:http://cran.r-project.org/web/packages/spdep/index.html][=spdep= package]] (\cite{Biva14}). To use this
 code, save the file [[./sppred.R][=sppred=]] in your working directory then submit
-=source("sppred.R")= to *R*. Some examples on the =boston= data are
-also available at section XX. The status of this work is actually
-under construction, comments are welcome.\\
+=source("sppred.R")= to R. Some examples from =boston= data are also
+available. The status of this work is actually under construction,
+comments are welcome.\\
 
 *=STILL TODO=* 
 - Code the variances and confidence intervals of predictors
@@ -32,38 +32,29 @@ under construction, comments are welcome.\\
 #+END_abstract
 #+TOC: headlines 1
 
-  # @Article{RePEc:eee:jhouse:v:21:y:2012:i:1:p:66-76,
-  # author={Kato, Takafumi},
-  # title={{Prediction in the lognormal regression model with spatial error dependence}},
-  # journal={Journal of Housing Economics},
-  # year=2012,
-  # volume={21},
-  # number={1},
-  # pages={66-76}
-
 * Theoretical framework
 ** Spatial econometric models
 
    The particularity of spatial econometric models is the /ex ante/
-   specification of interdependence between statistical units,
-   typically from their spatial proximity.  Consequently, resulting
-   predictions not only depend on the variables of the target units
-   (i.e., the units for which we want to predict the outcome) but
-   potentially involve the entire set of both explanatory as well as
-   dependent variable sample data observations.  This implies that the
-   sample pattern of the outcomes or the residuals contains additional
-   information which may be used to modify the regression function so
-   as to reduce the prediction variance [[cite:Gold62]].
+   specification of interdependence between observation, typically
+   from their spatial proximity.  Consequently, resulting predictions
+   not only depend on the variables of the target units (i.e., the
+   units for which we want to predict the outcome) but potentially
+   involve the entire set of both explanatory and dependent variables
+   of sample data observations.  This implies that the sample pattern
+   of the outcomes or the residuals contains additional information
+   which may be used to modify the regression function so as to reduce
+   the prediction variance ([[cite:Gold62]]).
 
    The literature about predicting from spatial econometric models is
    not actually unified, due to different modeling frameworks and
-   notations: see \cite{LPac04, PLes08} and \cite{KPru07}.  A first
-   contribution of this document is to unify the different predictors
-   proposed in the literature into an integrative spatial econometric
-   framework.  A second contribution is to present the *R* function
-   =sppred= that implements all the spatial predictors and presents
-   some empirical evidence on their relative performance on a
-   well-known dataset (=boston=, \cite{Biva14}).
+   notations: see \cite{LPac04, PLes08} \cite{KPru07}, and
+   \cite{TALG13}.  A first contribution of this work is to unify the
+   different predictors proposed in the literature into an integrative
+   spatial econometric framework.  A second contribution is to present
+   the *R* function =sppred= that implements all the spatial
+   predictors and presents some empirical evidence on their relative
+   performance on a well-known dataset (=boston= from \cite{Biva14}).
 
    We present analytically the available predictors from spatial
    econometric models estimated on a sample of $N$ spatial units. We
@@ -73,36 +64,37 @@ under construction, comments are welcome.\\
 
 \begin{align}
 y & = \alpha+ \rho Wy+X\beta+ WX\theta+ u\nonumber\\
-u & = \lambda W u+ \varepsilon \;\;\mbox{ with }\;\; \varepsilon\sim \mathbf{N}(0, \sigma^2I_N)\nonumber
+u & = \lambda W u+ \varepsilon \;\;\mbox{ with }\;\; 
+\varepsilon\sim \mathbf{N}(0, \sigma^2_{\varepsilon}I_N)\nonumber
 \end{align}
 
    The term $y$ is a $N\times 1$ vector of the continuous outcome of
    interest, $X$ is a $N\times K$ matrix of the $K$ non-constant
    covariates, and $W$ is a $N\times N$ full-rank spatial weight
-   matrix (see Anselin 1988). We limit ourselves to a same weight
+   matrix (see \cite{Anse88}). We limit ourselves to a same weight
    matrix in the outcome and error equations, but formally nothing
    requires this restriction. The unknown parameters (or vectors of
    parameters) $\alpha$, $\rho$, $\beta$, $\theta$, $\lambda$ and
-   $\sigma$ grouped in $\Theta$ have to be estimated, as the vector
-   $\varepsilon$ of innovations. Classically, we assume that
-   $\mbox{diag}(W)= 0$ and $|\,\rho\,|$, $|\,\lambda\,|< 1$. The
+   $\sigma_{\varepsilon}$ grouped in $\Theta$ have to be estimated, as
+   the vector $\varepsilon$ of innovations. Classically, we assume
+   that $\mbox{diag}(W)= 0$ and $|\,\rho\,|$, $|\,\lambda\,|< 1$. The
    spatial weight matrix $W$ does not need to be symmetric.
 
    This form is sufficiently general that the spatial autoregressive
    conditional (SAC) model can be recovered with $\theta= 0$, the
    spatial Durbin model (SDM) model with $\lambda=0$, the spatial
    autoregressive (SAR) model with $\theta=\lambda=0$, the spatial X
-   model (SXM, also called Spatial Durban Error Model by LeSage and
-   Pace, 2009) with $\rho=0$ and the spatial error model (SEM) can be
-   recovered with $\rho=\theta= 0$. All these models can be estimated
-   by maximum likelihood through the functions =errorsarlm=,
-   =lagsarlm=, and =sacsarlm= of the *R* package =spdep= (Bivand,
-   2014).
+   model (SXM, also called Spatial Durban Error Model by
+   \cite{LPac08}) with $\rho=0$ and the spatial error model (SEM) can
+   be recovered with $\rho=\theta= 0$. All these models can be
+   estimated by maximum likelihood through the functions =errorsarlm=,
+   =lagsarlm=, and =sacsarlm= of the *R* package =spdep=
+   \cite{Biva14}.
 
    For future reference, note that the general SMC model can be
    reduced in $y= (I-\rho W)^{-1}X\beta +(I-\rho W)^{-1}(I-\lambda
-   W)^{-1}\varepsilon$, with a distribution that involves all of the
-   model parameters:
+   W)^{-1}\varepsilon$, which is parametrized by a distribution that
+   involves all of the model parameters:
 
 \begin{equation}
 y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
@@ -116,22 +108,35 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
    literature, we consider hereafter that the set of parameters
    $\Theta$ is known with certainty.  This has the advantage of
    simplifying notations by neglecting a source of uncertainty that
-   depends on the sample size.  Moreover, all the parameters are
-   estimated simultaneously and it makes no sens to consider $\Theta$
-   as partially known.  Hence, the predictors presented are all
-   conditioned by $\Theta$, which is dropped from conditioning sets
-   for the sake of clarity.  So its not the true BLUP but an
-   approximation, in this framework parameters are exogenous. In the
-   bivariate formulation, This is the general BLUP framework shared by
-   all the literature.  The minimum mean square error predictor (the
-   best) is the conditional mean corresponding to the information set.
-   [normal expression here]. In the loo case, it is strange because
-   the information set is different for each prediction and there is a
-   contradiction about the information sets between two
-   predictions. Without this contradiction we are in LSP with
-   partitioned matrix. Our distinction between stochastic and non
-   stochastic part can be linked to signal and trend terminology
-   [[cite:Hain93]].
+   depends on the sample size, data quality, etc.  Moreover, all the
+   parameters are estimated simultaneously and it makes no sens to
+   consider $\Theta$ as partially known.  Hence, the predictors
+   presented are all conditioned by $\Theta$, which is dropped from
+   conditioning sets for the sake of clarity.  
+
+   (peut-être mettre du os des ici) With such autocorrelation in the
+   stochastic components, it was known since \cite{Gold62} that the
+   best linear unbiased estimator of $y$ is not the best linear
+   unbiased predictor (BLUP).  Applying the BLUP formula allows us to
+   obtain:
+
+\begin{equation}
+\mathbf{E}(y\mid \Lambda)= \alpha+ \rho W\mathbf{E}(y \mid \Lambda) +X\beta + WX\theta +\mathbf{E}(u \mid \Lambda) 
+\end{equation}
+
+   As we will see below, defining the conditional set $\Lambda$ in
+   spatial models is not trivial.  Some inconsistencies in the
+   literature reinforce this feeling.
+
+   Previous equation is fairly general, as it uses only the exogeneity
+   of the predictors $X$ applied to equation (1).  So its not the true
+   BLUP but an approximation, in this framework parameters are
+   exogenous. In the bivariate formulation, This is the general BLUP
+   framework shared by all the literature.  The minimum mean square
+   error predictor (the best) is the conditional mean corresponding to
+   the information set.  [normal expression here]. Our distinction
+   between stochastic and non stochastic part can be linked to signal
+   and trend terminology [[cite:Hain93]].
 
    Finally, note that geo-statistical models (typically from the
    kriging methods, \cite{CCas93}) are aware about the need for using
@@ -144,11 +149,13 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
    reverse is not true.[fn:3]
 
 ** Implementing predictions
+*** The information sets
 
    The interest in predicting from spatial econometric models are
    multiple and the code used for this have to be customizable because
    different reasons lead to different predictors. One can cite with
    [[cite:PLes08]]:
+
    - implement counter-factual predictions to better interpret (direct
      and indirect effects)
    - extrapolate into the future the outcome variable of interest
@@ -157,9 +164,20 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
      vs signal)
    - fill in the gap in the case of spatially missing observations of
      the outcome variable.
+
    Trade-off between simplicity and efficiency according to the
    information set used, and it depends on case study so it is
    important for a software to implement numerous.
+
+   ex-post predictions, for the temporal dimension. ex-ante we have to
+   also estimate the independent variables
+
+   In spatial econometrics, the usual distinction between in-sample
+   (IS) and out-of-sample (OS) predictions has firstly to be
+   refined. It is not simply inside our outside the calibration sample
+   but it has also some relations (or not) with it.
+
+*** In-sample predictions
 
    Basically, we consider $M$ target spatial units for which we want
    to predict the values of the outcome $y$.  These units may or may
@@ -219,6 +237,8 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
    is based on the same conditioning set, except that we consider the
    predictions individually of each OS units indexed $i$.
 
+*** Ex-sample predictions
+
 \begin{equation}
 \tag{prdLSP}\mathbf{E}(y_i\mid X, W, y_{IS})= (I_n-\rho W)^{-1}X\widehat{\beta}+ WX\widehat{\theta}
                                             + \Omega_{21}\Omega_{11}^{-1}(y_{IS}-\mathbf{E}(y_{IS}\mid X, W))\label{prdLSP}
@@ -233,6 +253,13 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
    BLUP correction of the stochastic part. This misleading appears
    because of the writing of the reduced form before taking the
    conditional expectation.
+
+*** Leave-one-out predictions
+
+    In the loo case, it is strange because the information set is
+    different for each prediction and there is a contradiction about
+    the information sets between two predictions. Without this
+    contradiction we are in LSP with partitioned matrix.
 
 \begin{equation}
 \tag{prdKP2}\mathbf{E}(y_i\mid X, W, y_{IS})= \rho Wy+ X\widehat{\beta}+ WX\widehat{\theta} 
@@ -273,16 +300,6 @@ y\mid X, W, \Theta \sim \mathbf{N}(\mu, \sigma_{\varepsilon}^2\Sigma),
 
    In the applied literature, one can found KP2 in Dubin (models?), KP4
    in \cite{BCHo07} (models?), LSP in Kato (models?)
-
-** A taxonomy of spatial sample schemes
-
-   ex-post predictions, for the temporal dimension. ex-ante we have to
-   also estimate the independent variables
-
-   In spatial econometrics, the usual distinction between in-sample
-   (IS) and out-of-sample (OS) predictions has firstly to be
-   refined. It is not simply inside our outside the calibration sample
-   but it has also some relations (or not) with it.
 
 * Current function from =spdep=
 
@@ -542,6 +559,8 @@ prdKPG <- function(prdKP1, prdWXy= prdWXy, yobs= yobs, rg= rg, loo= loo){
 #+end_src
 
 *** Custom Predictor
+
+    [[cite:Kato12]]
 
 #+begin_src R :results silent :tangle ./sppred.R
 prdctm <- function(prdWX, rho, lab, lsw, yobs){
@@ -1300,7 +1319,7 @@ lwsubset <- function (x, focal= rep(TRUE, length(x)),
   model with autoregressive disturbances, SARAR(1,1), by
   \cite{KPru98}. The notations of spatial lag coefficients also
   depends on authors, we adopt here those of the *R* package =spdep=
-  (Bivand, 2014).
+  (\cite{Biva14}).
 
 [fn:2] In particular, it could be of interest to predict outcome
   values for units with known $y$ for diagnostic, goodness-of-fit
