@@ -1,6 +1,6 @@
 
 sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
-                   condset= "DEF", blup = NULL, loo = FALSE, rg = NULL,
+                   condset= "DEF", blup = NULL, loo = FALSE, rg = NULL, SCrho= FALSE, SClab= FALSE,
                    power = NULL, zero.policy = NULL, legacy = TRUE, order = 250,
                    tol= .Machine$double.eps^(3/5), ..., tst= 1, ctm= F) {
     require(spdep)
@@ -42,13 +42,15 @@ sppred <- function(object, newdata = NULL, listw = NULL, yobs= object$y,
     prdX <- as.vector(X %*% B)
     if (pt> 1) prdWX   <- prdWX(prdX, X, Bl, mod, lsw)
     if (pt> 2 && pt!= 4) prdKP1  <- prdKP1(prdWX, rho, lsw, power, order, tol)
+    if (SCrho) rho= 0
+    if (SClab) lab= 0
     if (pt> 3 && tst== 1){
         prdWXy <- prdWX+
             rho* lag.listw(lsw, yobs)+ lab* lag.listw(lsw, yobs- prdWX)}
     if (pt> 3 && tst== 2){
         prdWXy <- prdWX+ rho* lag.listw(lsw, yobs)}
     if (pt==5) prdLSP <- prdLSP(prdKP1, rho, lab, lsw, yobs, loo)
-    if (pt==6) prdKPG <- prdKPG(prdKP1, prdWXy, rg, yobs)
+    if (pt==6) prdKPG <- prdKPG(prdKP1, yobs, rg, loo)
     if (pt> 6 && !loo) stop("Set loo= TRUE for this blup predictor")
     if (pt==7){
         prdKP2 <- prdKP2(prdKP1, prdWXy,
@@ -146,19 +148,12 @@ prdKP3 <- function(prdKP1, prdWXy= prdWXy, rho= rho, lab= lab, lsw= lsw,
     prdKP3
 }
 
-prdKPG <- function(prdKP1, prdWXy= prdWXy, yobs= yobs, rg= rg, loo= loo){
+prdKPG <- function(prdKP1, yobs= yobs, rg= rg, loo= loo){
     if(dim(rg)[ 1]!= length(yobs) || dim(rg)[ 2]!= length(yobs))
         stop("BLUP correction is not of the good dimension")
-    if (loo){
-        prdKPG <- matrix(NA, ncol= 1, nrow= length(prdWXy))
-        for (i in 1: length(prdWXy)){
-            prdKPG[ i] <- prdWXy[ i]-
-                (rg[i, -i] %*% (yobs[ -i]- prdKP1[ -i])/ rg[i, i])
-        }
-    } else {
-        rgd <- rg
-        prdKPG <- prdWXy+ ((solve(rgd) %*% rg %*% (yobs- prdKP1)))
-    }
+    if (!loo){
+        prdKPG <- prdKP1+ rg %*% yobs
+    } else{ stop("Leave-one-out not implemented for custom")}
     prdKPG
 }
 
